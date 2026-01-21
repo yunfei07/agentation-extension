@@ -10,7 +10,6 @@ const links = [
   { href: "/features", label: "Features" },
   { href: "/output", label: "Output" },
   { href: "/faq", label: "FAQ" },
-  { href: "/to-do", label: "To-Do" },
 ];
 
 type OutputFormat = 'compact' | 'standard' | 'detailed' | 'forensic';
