@@ -35,14 +35,32 @@ export default function SchemaPage() {
         <section>
           <h2 id="overview">Overview</h2>
           <p>
-            The Agentation Format is an open schema for capturing UI feedback
-            in a way that AI coding agents can reliably parse and act on. It
-            bridges the gap between what humans see in a browser and what agents
-            need to locate and fix code.
+            The Agentation Schema is an open format for capturing UI feedback
+            in a way that AI coding agents can reliably parse and act on. Think
+            of it like <strong>smart Figma comments for your running app</strong> &mdash; persistent
+            annotations attached to specific elements, with threads, status tracking,
+            resolution workflows, and structured metadata that agents can actually understand.
           </p>
           <p>
             This spec defines the annotation object shape. Tools can emit annotations
             in this format, and agents can consume them regardless of how they were created.
+          </p>
+        </section>
+
+        <section>
+          <h2 id="what-this-unlocks">What This Unlocks</h2>
+          <p>
+            A structured schema isn&apos;t just about clean data &mdash; it enables entirely new workflows:
+          </p>
+          <ul>
+            <li><strong>Two-way communication</strong> &mdash; Agents can reply to annotations, asking &ldquo;Should this be 24px or 16px?&rdquo; and get responses in the same thread</li>
+            <li><strong>Status tracking</strong> &mdash; See what&apos;s pending, acknowledged, resolved, or dismissed at a glance</li>
+            <li><strong>Cross-page queries</strong> &mdash; &ldquo;What annotations do I have?&rdquo; works across your entire site</li>
+            <li><strong>Bulk operations</strong> &mdash; &ldquo;Clear all annotations&rdquo; or &ldquo;Show me blocking issues only&rdquo;</li>
+            <li><strong>Persistent history</strong> &mdash; Feedback survives page refreshes and browser sessions</li>
+          </ul>
+          <p>
+            Without a schema, feedback is fire-and-forget. With one, it becomes a conversation.
           </p>
         </section>
 

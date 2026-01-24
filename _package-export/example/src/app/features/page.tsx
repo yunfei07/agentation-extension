@@ -114,6 +114,25 @@ export default function FeaturesPage() {
       </section>
 
       <section>
+        <h2 id="agent-communication">Agent communication</h2>
+        <p>
+          With <a href="/agents">MCP integration</a> and the <a href="/schema">Agentation Schema</a>, annotations become a two-way conversation.
+          Agents can query, respond to, and manage your feedback:
+        </p>
+        <div style={{ marginTop: '1rem', fontSize: '0.8125rem', lineHeight: 1.7 }}>
+          <p style={{ margin: '0.5rem 0' }}><span style={{ color: 'rgba(0,0,0,0.4)' }}>You:</span> &ldquo;What annotations do I have?&rdquo;</p>
+          <p style={{ margin: '0.5rem 0' }}><span style={{ color: '#4a9eff' }}>Agent:</span> &ldquo;3 annotations: button on /checkout, contrast on /settings, typo on /about.&rdquo;</p>
+          <p style={{ margin: '0.5rem 0' }}><span style={{ color: 'rgba(0,0,0,0.4)' }}>You:</span> &ldquo;Fix the button&rdquo;</p>
+          <p style={{ margin: '0.5rem 0' }}><span style={{ color: '#4a9eff' }}>Agent:</span> &ldquo;Left-align or center with the form?&rdquo;</p>
+          <p style={{ margin: '0.5rem 0' }}><span style={{ color: 'rgba(0,0,0,0.4)' }}>You:</span> &ldquo;Center&rdquo;</p>
+          <p style={{ margin: '0.5rem 0' }}><span style={{ color: '#4a9eff' }}>Agent:</span> &ldquo;Done. Marked as resolved.&rdquo;</p>
+        </div>
+        <p style={{ marginTop: '1rem', fontSize: '0.8125rem', color: 'rgba(0,0,0,0.5)' }}>
+          Agents can acknowledge, ask questions, resolve with summaries, or dismiss with reasons.
+        </p>
+      </section>
+
+      <section>
         <h2 id="settings">Settings</h2>
         <p>The <svg style={{ display: 'inline-block', verticalAlign: '-0.38em', width: '1.5em', height: '1.5em', margin: '0 -0.1em' }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M10.6504 5.81117C10.9939 4.39628 13.0061 4.39628 13.3496 5.81117C13.5715 6.72517 14.6187 7.15891 15.4219 6.66952C16.6652 5.91193 18.0881 7.33479 17.3305 8.57815C16.8411 9.38134 17.2748 10.4285 18.1888 10.6504C19.6037 10.9939 19.6037 13.0061 18.1888 13.3496C17.2748 13.5715 16.8411 14.6187 17.3305 15.4219C18.0881 16.6652 16.6652 18.0881 15.4219 17.3305C14.6187 16.8411 13.5715 17.2748 13.3496 18.1888C13.0061 19.6037 10.9939 19.6037 10.6504 18.1888C10.4285 17.2748 9.38135 16.8411 8.57815 17.3305C7.33479 18.0881 5.91193 16.6652 6.66952 15.4219C7.15891 14.6187 6.72517 13.5715 5.81117 13.3496C4.39628 13.0061 4.39628 10.9939 5.81117 10.6504C6.72517 10.4285 7.15891 9.38134 6.66952 8.57815C5.91193 7.33479 7.33479 5.91192 8.57815 6.66952C9.38135 7.15891 10.4285 6.72517 10.6504 5.81117Z"/><circle cx="12" cy="12" r="2.5"/></svg> icon lets you customize Agentation to fit your workflow.</p>
         <SettingsDemo />

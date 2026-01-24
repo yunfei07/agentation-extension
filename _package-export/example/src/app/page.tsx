@@ -161,6 +161,22 @@ export default function AgentationDocs() {
         </section>
 
         <section>
+          <h2>Agents talk back</h2>
+          <p>
+            With <a href="/agents">MCP integration</a> and the <a href="/schema">Agentation Schema</a>, agents don&rsquo;t just read your annotations &mdash; they can respond to them:
+          </p>
+          <ul>
+            <li><strong>&ldquo;What annotations do I have?&rdquo;</strong> &mdash; List all feedback across pages</li>
+            <li><strong>&ldquo;Should this be 24px or 16px?&rdquo;</strong> &mdash; Agent asks for clarification</li>
+            <li><strong>&ldquo;Fixed the padding&rdquo;</strong> &mdash; Agent resolves with a summary</li>
+            <li><strong>&ldquo;Clear all annotations&rdquo;</strong> &mdash; Dismiss everything at once</li>
+          </ul>
+          <p>
+            Your feedback becomes a conversation, not a one-way ticket into the void.
+          </p>
+        </section>
+
+        <section>
           <h2>Best practices</h2>
           <ul>
             <li><strong>Be specific</strong> &mdash; &ldquo;Button text unclear&rdquo; is better than &ldquo;fix this&rdquo;</li>
