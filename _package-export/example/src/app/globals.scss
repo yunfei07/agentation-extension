@@ -1015,4 +1015,13 @@ button {
       margin-top: 0;
     }
   }
+
+  .arrow {
+    display: inline-block;
+    transition: transform 0.15s ease;
+  }
+
+  a:hover .arrow {
+    transform: translateX(3px);
+  }
 }

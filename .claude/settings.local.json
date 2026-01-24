@@ -104,7 +104,9 @@
       "Bash(__NEW_LINE_12d29f3d9b87d722__ echo \"\")",
       "Bash(node -e:*)",
       "Bash(for id in mkrmm3zz-rbebyx mkrmqadk-9d4tpa mkrmut61-r71a6h)",
-      "Bash(do echo \"=== Session: $id ===\" curl -s \"http://localhost:4748/sessions/$id\")"
+      "Bash(do echo \"=== Session: $id ===\" curl -s \"http://localhost:4748/sessions/$id\")",
+      "Bash(git rev-parse:*)",
+      "Bash(git log:*)"
     ]
   }
 }

@@ -212,8 +212,6 @@ export default function ColophonPage() {
         }
       `}</style>
       <div className="colophon-page">
-        <h1>Colophon</h1>
-
         <div className="colophon-content">
           <p>
             Agentation is a React component for annotating web pages and generating structured
