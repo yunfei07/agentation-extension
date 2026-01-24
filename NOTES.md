@@ -9,7 +9,13 @@
 ## Current state
 - Branch: `feature/combined-release`
 - Last commit: `ca51deb Replace MCP toggle with pulsing status dot`
-- MCP server config added to `~/.claude/claude_code_config.json`
+- MCP server config in `~/.claude.json` under `projects["/path/to/agentation"].mcpServers`:
+  ```json
+  "agentation": {
+    "type": "http",
+    "url": "http://localhost:4747/mcp"
+  }
+  ```
 
 ## Next steps
 1. Restart Claude Code to load MCP config
