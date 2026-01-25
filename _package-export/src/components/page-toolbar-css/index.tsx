@@ -516,6 +516,12 @@ export function PageFeedbackToolbarCSS({
   );
   const [availableSessions, setAvailableSessions] = useState<Session[]>([]);
 
+  // DEBUG: temporary toggle for testing width animation
+  const [debugMcpOverride, setDebugMcpOverride] = useState<boolean | null>(null);
+  const effectiveConnectionStatus = debugMcpOverride === null
+    ? connectionStatus
+    : debugMcpOverride ? "connected" : "disconnected";
+
   // Draggable toolbar state
   const [toolbarPosition, setToolbarPosition] = useState<{
     x: number;
@@ -2157,7 +2163,7 @@ export function PageFeedbackToolbarCSS({
       >
         {/* Morphing container */}
         <div
-          className={`${styles.toolbarContainer} ${!isDarkMode ? styles.light : ""} ${isActive ? styles.expanded : styles.collapsed} ${showEntranceAnimation ? styles.entrance : ""} ${isDraggingToolbar ? styles.dragging : ""}`}
+          className={`${styles.toolbarContainer} ${!isDarkMode ? styles.light : ""} ${isActive ? styles.expanded : styles.collapsed} ${showEntranceAnimation ? styles.entrance : ""} ${isDraggingToolbar ? styles.dragging : ""} ${effectiveConnectionStatus === "connected" ? styles.serverConnected : ""}`}
           data-agent-mode={settings.agentMode}
           onClick={
             !isActive
@@ -2262,39 +2268,38 @@ export function PageFeedbackToolbarCSS({
             </div>
 
             {/* Sync button - auto-synced state for Claude Code, clickable for Manual/Custom */}
-            {connectionStatus === "connected" && (
-              <div className={styles.buttonWrapper}>
-                <button
-                  className={`${styles.controlButton} ${!isDarkMode ? styles.light : ""}`}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    if (settings.agentMode !== "claude-code") {
-                      sendToAgent();
-                    }
-                  }}
-                  disabled={!hasAnnotations && settings.agentMode !== "claude-code"}
-                  data-active={sent || settings.agentMode === "claude-code"}
-                  data-auto-sync={settings.agentMode === "claude-code"}
-                  data-failed={sendFailed}
-                >
-                  <IconSendAnimated size={24} sent={sent || settings.agentMode === "claude-code"} />
-                  {hasAnnotations && !sent && !sendFailed && settings.agentMode !== "claude-code" && (
-                    <span className={`${styles.buttonBadge} ${!isDarkMode ? styles.light : ""}`}>{annotations.length}</span>
-                  )}
-                </button>
-                <span className={`${styles.buttonTooltip} ${sent || sendFailed ? styles.tooltipVisible : ""}`}>
-                  {settings.agentMode === "claude-code"
-                    ? "Auto-synced"
-                    : sendFailed
-                      ? "No listeners"
-                      : sent
-                        ? (settings.agentMode === "custom"
-                            ? `Sent to ${lastDelivery?.webhooks || 0} webhook${lastDelivery?.webhooks === 1 ? "" : "s"}`
-                            : "Sent!")
-                        : (settings.agentMode === "custom" ? "Trigger webhooks" : "Send to agent")}
-                </span>
-              </div>
-            )}
+            <div className={`${styles.buttonWrapper} ${styles.sendButtonWrapper} ${effectiveConnectionStatus === "connected" ? styles.sendButtonVisible : ""}`}>
+              <button
+                className={`${styles.controlButton} ${!isDarkMode ? styles.light : ""}`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (settings.agentMode !== "claude-code") {
+                    sendToAgent();
+                  }
+                }}
+                disabled={!hasAnnotations && settings.agentMode !== "claude-code"}
+                data-active={sent || settings.agentMode === "claude-code"}
+                data-auto-sync={settings.agentMode === "claude-code"}
+                data-failed={sendFailed}
+                tabIndex={effectiveConnectionStatus === "connected" ? 0 : -1}
+              >
+                <IconSendAnimated size={24} sent={sent || settings.agentMode === "claude-code"} />
+                {hasAnnotations && !sent && !sendFailed && settings.agentMode !== "claude-code" && (
+                  <span className={`${styles.buttonBadge} ${!isDarkMode ? styles.light : ""}`}>{annotations.length}</span>
+                )}
+              </button>
+              <span className={`${styles.buttonTooltip} ${sent || sendFailed ? styles.tooltipVisible : ""}`}>
+                {settings.agentMode === "claude-code"
+                  ? "Auto-synced"
+                  : sendFailed
+                    ? "No listeners"
+                    : sent
+                      ? (settings.agentMode === "custom"
+                          ? `Sent to ${lastDelivery?.webhooks || 0} webhook${lastDelivery?.webhooks === 1 ? "" : "s"}`
+                          : "Sent!")
+                      : (settings.agentMode === "custom" ? "Trigger webhooks" : "Send to agent")}
+              </span>
+            </div>
 
             <div className={styles.buttonWrapper}>
               <button
@@ -3204,6 +3209,56 @@ export function PageFeedbackToolbarCSS({
           )}
         </div>
       )}
+
+      {/* DEBUG: Temporary toggle for testing MCP width animation */}
+      <div
+        style={{
+          position: "fixed",
+          bottom: 20,
+          left: 20,
+          zIndex: 2147483646,
+          display: "flex",
+          gap: 8,
+          alignItems: "center",
+          background: "rgba(0,0,0,0.8)",
+          padding: "8px 12px",
+          borderRadius: 8,
+          fontFamily: "system-ui, sans-serif",
+          fontSize: 12,
+          color: "#fff",
+        }}
+      >
+        <span>MCP:</span>
+        <button
+          onClick={() => setDebugMcpOverride(debugMcpOverride === true ? null : true)}
+          style={{
+            padding: "4px 8px",
+            borderRadius: 4,
+            border: "none",
+            background: debugMcpOverride === true ? "#22c55e" : "#333",
+            color: "#fff",
+            cursor: "pointer",
+          }}
+        >
+          On
+        </button>
+        <button
+          onClick={() => setDebugMcpOverride(debugMcpOverride === false ? null : false)}
+          style={{
+            padding: "4px 8px",
+            borderRadius: 4,
+            border: "none",
+            background: debugMcpOverride === false ? "#ef4444" : "#333",
+            color: "#fff",
+            cursor: "pointer",
+          }}
+        >
+          Off
+        </button>
+        <span style={{ opacity: 0.5, marginLeft: 4 }}>
+          {debugMcpOverride === null ? `(actual: ${connectionStatus})` : "(override)"}
+        </span>
+      </div>
     </>,
     document.body,
   );
