@@ -2672,7 +2672,16 @@ export function PageFeedbackToolbarCSS({
                       className={styles.cycleButtonText}
                       title={availableSessions.find(s => s.id === currentSessionId)?.url}
                     >
-                      {truncateUrl(availableSessions.find(s => s.id === currentSessionId)?.url || pathname)}
+                      {(() => {
+                        const session = availableSessions.find(s => s.id === currentSessionId);
+                        if (!session) return "Current";
+                        const path = truncateUrl(session.url);
+                        const time = formatRelativeTime(session.createdAt);
+                        // If path is just "/", show time as primary
+                        if (path === "/") return time;
+                        // Otherwise show path with time
+                        return `${path} · ${time}`;
+                      })()}
                     </span>
                     {availableSessions.length > 1 && (
                       <span className={styles.cycleDots}>

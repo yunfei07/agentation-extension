@@ -163,7 +163,7 @@ export default function AgentationDocs() {
         <section>
           <h2>Agents talk back</h2>
           <p>
-            With <a href="/agents">MCP integration</a> and the <a href="/schema">Agentation Schema</a>, agents don&rsquo;t just read your annotations &mdash; they can respond to them:
+            With <a href="/agents">MCP integration</a> and the <a href="/schema">Annotation Format Schema</a>, agents don&rsquo;t just read your annotations &mdash; they can respond to them:
           </p>
           <ul>
             <li><strong>&ldquo;What annotations do I have?&rdquo;</strong> &mdash; List all feedback across pages</li>

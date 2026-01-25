@@ -116,7 +116,7 @@ export default function FeaturesPage() {
       <section>
         <h2 id="agent-communication">Agent communication</h2>
         <p>
-          With <a href="/agents">MCP integration</a> and the <a href="/schema">Agentation Schema</a>, annotations become a two-way conversation.
+          With <a href="/agents">MCP integration</a> and the <a href="/schema">Annotation Format Schema</a>, annotations become a two-way conversation.
           Agents can query, respond to, and manage your feedback:
         </p>
         <div style={{ marginTop: '1rem', fontSize: '0.8125rem', lineHeight: 1.7 }}>
