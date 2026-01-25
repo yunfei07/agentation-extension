@@ -7,8 +7,8 @@
  * - MCP server for Claude Code to read and act on annotations
  *
  * Usage:
- *   npx agentation server [--port 4747] [--mcp-only] [--http-url URL]
- *   agentation server [--port 4747] [--mcp-only] [--http-url URL]
+ *   npx agentation-mcp server [--port 4747] [--mcp-only] [--http-url URL]
+ *   agentation-mcp server [--port 4747] [--mcp-only] [--http-url URL]
  *
  * Options:
  *   --port <number>   HTTP server port (default: 4747)
@@ -17,11 +17,11 @@
  */
 
 import { startHttpServer } from "./http.js";
-import { startMcpServer } from "./mcp.js";
+import { startMcpServer, setApiKey } from "./mcp.js";
 
 // Re-export for programmatic use
-export { startHttpServer } from "./http.js";
-export { startMcpServer } from "./mcp.js";
+export { startHttpServer, setCloudApiKey } from "./http.js";
+export { startMcpServer, setApiKey } from "./mcp.js";
 export * from "./store.js";
 
 // -----------------------------------------------------------------------------
@@ -78,7 +78,7 @@ async function main(): Promise<void> {
 // Only run if this is the main module (CLI entry point)
 // Check if we're being run directly vs imported
 const isMainModule = process.argv[1]?.includes("server") ||
-                     process.argv[1]?.endsWith("agentation");
+                     process.argv[1]?.endsWith("agentation-mcp");
 
 if (isMainModule) {
   main().catch((err) => {

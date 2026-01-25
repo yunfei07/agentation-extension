@@ -20,6 +20,7 @@ import type { ActionRequest } from "../types.js";
 // -----------------------------------------------------------------------------
 
 let httpBaseUrl = "http://localhost:4747";
+let apiKey: string | undefined;
 
 /**
  * Set the HTTP server URL that this MCP server will fetch from.
@@ -28,12 +29,23 @@ export function setHttpBaseUrl(url: string): void {
   httpBaseUrl = url;
 }
 
+/**
+ * Set the API key for authenticating with the cloud backend.
+ */
+export function setApiKey(key: string): void {
+  apiKey = key;
+}
+
 // -----------------------------------------------------------------------------
 // HTTP Client
 // -----------------------------------------------------------------------------
 
 async function httpGet<T>(path: string): Promise<T> {
-  const res = await fetch(`${httpBaseUrl}${path}`);
+  const headers: Record<string, string> = {};
+  if (apiKey) {
+    headers["x-api-key"] = apiKey;
+  }
+  const res = await fetch(`${httpBaseUrl}${path}`, { headers });
   if (!res.ok) {
     const body = await res.text();
     throw new Error(`HTTP ${res.status}: ${body}`);
@@ -42,9 +54,13 @@ async function httpGet<T>(path: string): Promise<T> {
 }
 
 async function httpPatch<T>(path: string, body: unknown): Promise<T> {
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (apiKey) {
+    headers["x-api-key"] = apiKey;
+  }
   const res = await fetch(`${httpBaseUrl}${path}`, {
     method: "PATCH",
-    headers: { "Content-Type": "application/json" },
+    headers,
     body: JSON.stringify(body),
   });
   if (!res.ok) {
@@ -55,9 +71,13 @@ async function httpPatch<T>(path: string, body: unknown): Promise<T> {
 }
 
 async function httpPost<T>(path: string, body: unknown): Promise<T> {
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (apiKey) {
+    headers["x-api-key"] = apiKey;
+  }
   const res = await fetch(`${httpBaseUrl}${path}`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers,
     body: JSON.stringify(body),
   });
   if (!res.ok) {
@@ -107,7 +127,7 @@ const WaitForActionSchema = z.object({
 // Tool Definitions
 // -----------------------------------------------------------------------------
 
-const TOOLS = [
+export const TOOLS = [
   {
     name: "agentation_list_sessions",
     description: "List all active annotation sessions",
@@ -293,13 +313,13 @@ type ToolResult = {
   isError?: boolean;
 };
 
-function success(data: unknown): ToolResult {
+export function success(data: unknown): ToolResult {
   return {
     content: [{ type: "text", text: JSON.stringify(data, null, 2) }],
   };
 }
 
-function error(message: string): ToolResult {
+export function error(message: string): ToolResult {
   return {
     content: [{ type: "text", text: message }],
     isError: true,
@@ -345,9 +365,13 @@ function waitForActionEvent(
       ? `${httpBaseUrl}/sessions/${sessionId}/events?agent=true`
       : `${httpBaseUrl}/events?agent=true`;
 
+    const sseHeaders: Record<string, string> = { Accept: "text/event-stream" };
+    if (apiKey) {
+      sseHeaders["x-api-key"] = apiKey;
+    }
     fetch(sseUrl, {
       signal: controller.signal,
-      headers: { Accept: "text/event-stream" },
+      headers: sseHeaders,
     })
       .then(async (res) => {
         if (!res.ok) {
@@ -415,7 +439,7 @@ function waitForActionEvent(
   });
 }
 
-async function handleTool(name: string, args: unknown): Promise<ToolResult> {
+export async function handleTool(name: string, args: unknown): Promise<ToolResult> {
   switch (name) {
     case "agentation_list_sessions": {
       const sessions = await httpGet<Session[]>("/sessions");
@@ -628,5 +652,13 @@ export async function startMcpServer(baseUrl?: string): Promise<void> {
   const transport = new StdioServerTransport();
   await server.connect(transport);
 
-  console.error(`[MCP] Agentation MCP server started on stdio (HTTP: ${httpBaseUrl})`);
+  // Log startup message with connection details
+  const isRemote = httpBaseUrl.startsWith("https://") || (!httpBaseUrl.includes("localhost") && !httpBaseUrl.includes("127.0.0.1"));
+  if (isRemote && apiKey) {
+    console.error(`[MCP] Agentation MCP server started on stdio (Remote: ${httpBaseUrl}, API key: configured)`);
+  } else if (isRemote) {
+    console.error(`[MCP] Agentation MCP server started on stdio (Remote: ${httpBaseUrl}, API key: not configured)`);
+  } else {
+    console.error(`[MCP] Agentation MCP server started on stdio (HTTP: ${httpBaseUrl})`);
+  }
 }

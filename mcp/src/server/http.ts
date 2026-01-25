@@ -4,6 +4,13 @@
  */
 
 import { createServer, type IncomingMessage, type ServerResponse } from "http";
+import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
+import { Server } from "@modelcontextprotocol/sdk/server/index.js";
+import {
+  CallToolRequestSchema,
+  ListToolsRequestSchema,
+} from "@modelcontextprotocol/sdk/types.js";
+import { TOOLS, handleTool, error as toolError } from "./mcp.js";
 import {
   createSession,
   getSession,
@@ -20,11 +27,64 @@ import {
 import { eventBus } from "./events.js";
 import type { Annotation, SAFEvent, ActionRequest } from "../types.js";
 
+// Cloud API configuration
+let cloudApiKey: string | undefined;
+const CLOUD_API_URL = "https://agentation-mcp-cloud.vercel.app/api";
+
+/**
+ * Set the API key for cloud storage mode.
+ * When set, the HTTP server proxies requests to the cloud API.
+ */
+export function setCloudApiKey(key: string | undefined): void {
+  cloudApiKey = key;
+}
+
+/**
+ * Check if we're in cloud mode (API key is set).
+ */
+function isCloudMode(): boolean {
+  return !!cloudApiKey;
+}
+
 // Track active SSE connections for cleanup
 const sseConnections = new Set<ServerResponse>();
 // Track agent SSE connections separately (for accurate delivery status)
 // These are connections from MCP wait_for_action, not browser toolbars
 const agentConnections = new Set<ServerResponse>();
+
+// -----------------------------------------------------------------------------
+// MCP HTTP Transport
+// -----------------------------------------------------------------------------
+
+// Store transports by session ID for stateful sessions
+const mcpTransports = new Map<string, StreamableHTTPServerTransport>();
+
+/**
+ * Initialize a new MCP server with HTTP transport for a session.
+ */
+function createMcpSession(): { server: Server; transport: StreamableHTTPServerTransport } {
+  const transport = new StreamableHTTPServerTransport({
+    sessionIdGenerator: () => crypto.randomUUID(),
+  });
+
+  const server = new Server(
+    { name: "agentation", version: "0.0.1" },
+    { capabilities: { tools: {} } }
+  );
+
+  server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: TOOLS }));
+  server.setRequestHandler(CallToolRequestSchema, async (req) => {
+    try {
+      return await handleTool(req.params.name, req.params.arguments);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Unknown error";
+      return toolError(message);
+    }
+  });
+
+  server.connect(transport);
+  return { server, transport };
+}
 
 // -----------------------------------------------------------------------------
 // Webhook Support
@@ -146,10 +206,95 @@ function handleCors(res: ServerResponse): void {
   res.writeHead(204, {
     "Access-Control-Allow-Origin": "*",
     "Access-Control-Allow-Methods": "GET, POST, PATCH, DELETE, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type",
+    "Access-Control-Allow-Headers": "Content-Type, Accept, Mcp-Session-Id",
+    "Access-Control-Expose-Headers": "Mcp-Session-Id",
     "Access-Control-Max-Age": "86400",
   });
   res.end();
+}
+
+// -----------------------------------------------------------------------------
+// Cloud Proxy
+// -----------------------------------------------------------------------------
+
+/**
+ * Proxy a request to the cloud API.
+ */
+async function proxyToCloud(
+  req: IncomingMessage,
+  res: ServerResponse,
+  pathname: string
+): Promise<void> {
+  const method = req.method || "GET";
+  const cloudUrl = `${CLOUD_API_URL}${pathname}`;
+
+  const headers: Record<string, string> = {
+    "x-api-key": cloudApiKey!,
+  };
+
+  // Forward content-type for requests with body
+  if (req.headers["content-type"]) {
+    headers["Content-Type"] = req.headers["content-type"];
+  }
+
+  let body: string | undefined;
+  if (method !== "GET" && method !== "HEAD") {
+    body = await new Promise<string>((resolve, reject) => {
+      let data = "";
+      req.on("data", (chunk) => (data += chunk));
+      req.on("end", () => resolve(data));
+      req.on("error", reject);
+    });
+  }
+
+  try {
+    const cloudRes = await fetch(cloudUrl, {
+      method,
+      headers,
+      body,
+    });
+
+    // Handle SSE responses
+    if (cloudRes.headers.get("content-type")?.includes("text/event-stream")) {
+      res.writeHead(cloudRes.status, {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        Connection: "keep-alive",
+        "Access-Control-Allow-Origin": "*",
+      });
+
+      const reader = cloudRes.body?.getReader();
+      if (reader) {
+        const pump = async () => {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            res.write(value);
+          }
+          res.end();
+        };
+        pump().catch(() => res.end());
+
+        req.on("close", () => {
+          reader.cancel();
+        });
+      }
+      return;
+    }
+
+    // Handle regular JSON responses
+    const data = await cloudRes.text();
+    res.writeHead(cloudRes.status, {
+      "Content-Type": cloudRes.headers.get("content-type") || "application/json",
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "GET, POST, PATCH, DELETE, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type",
+    });
+    res.end(data);
+  } catch (err) {
+    console.error("[Cloud Proxy] Error:", err);
+    sendError(res, 502, `Cloud proxy error: ${(err as Error).message}`);
+  }
 }
 
 // -----------------------------------------------------------------------------
@@ -505,6 +650,115 @@ const globalSseHandler: RouteHandler = async (req, res) => {
   });
 };
 
+/**
+ * Handle MCP protocol requests at /mcp endpoint.
+ * Supports POST (requests), GET (SSE stream), and DELETE (session cleanup).
+ */
+async function handleMcp(req: IncomingMessage, res: ServerResponse): Promise<void> {
+  const method = req.method || "GET";
+  const sessionId = req.headers["mcp-session-id"] as string | undefined;
+
+  // Add CORS headers to all responses
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Accept, Mcp-Session-Id");
+  res.setHeader("Access-Control-Expose-Headers", "Mcp-Session-Id");
+
+  // POST: Handle JSON-RPC requests
+  if (method === "POST") {
+    let transport: StreamableHTTPServerTransport;
+
+    if (sessionId) {
+      // Session ID provided - must exist in our map
+      if (!mcpTransports.has(sessionId)) {
+        res.writeHead(404, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({
+          jsonrpc: "2.0",
+          error: { code: -32000, message: "Session not found. Please re-initialize." },
+          id: null
+        }));
+        return;
+      }
+      transport = mcpTransports.get(sessionId)!;
+    } else {
+      // No session ID - this should be an initialize request, create new session
+      const { transport: newTransport } = createMcpSession();
+      transport = newTransport;
+    }
+
+    try {
+      // Read the request body
+      const body = await new Promise<string>((resolve, reject) => {
+        let data = "";
+        req.on("data", (chunk) => (data += chunk));
+        req.on("end", () => resolve(data));
+        req.on("error", reject);
+      });
+
+      const parsedBody = body ? JSON.parse(body) : undefined;
+
+      // Handle the request through the transport (it writes directly to res)
+      await transport.handleRequest(req, res, parsedBody);
+
+      // Store the transport with its session ID after the request is handled (for new sessions)
+      const newSessionId = transport.sessionId;
+      if (newSessionId && !mcpTransports.has(newSessionId)) {
+        mcpTransports.set(newSessionId, transport);
+        console.log(`[MCP HTTP] New session created: ${newSessionId}`);
+      }
+    } catch (err) {
+      console.error("[MCP HTTP] Error handling request:", err);
+      if (!res.headersSent) {
+        res.writeHead(500, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "Internal server error" }));
+      }
+    }
+    return;
+  }
+
+  // GET: SSE stream for notifications
+  if (method === "GET") {
+    if (!sessionId || !mcpTransports.has(sessionId)) {
+      res.writeHead(400, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Missing or invalid Mcp-Session-Id" }));
+      return;
+    }
+
+    const transport = mcpTransports.get(sessionId)!;
+
+    try {
+      // Handle the SSE request (transport writes directly to res)
+      await transport.handleRequest(req, res);
+    } catch (err) {
+      console.error("[MCP HTTP] Error handling SSE:", err);
+      if (!res.headersSent) {
+        res.writeHead(500, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "Internal server error" }));
+      }
+    }
+    return;
+  }
+
+  // DELETE: Session cleanup
+  if (method === "DELETE") {
+    if (sessionId && mcpTransports.has(sessionId)) {
+      const transport = mcpTransports.get(sessionId)!;
+      await transport.close();
+      mcpTransports.delete(sessionId);
+      res.writeHead(204);
+      res.end();
+    } else {
+      res.writeHead(404, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Session not found" }));
+    }
+    return;
+  }
+
+  // Method not allowed
+  res.writeHead(405, { "Content-Type": "application/json" });
+  res.end(JSON.stringify({ error: "Method not allowed" }));
+}
+
 // -----------------------------------------------------------------------------
 // Router
 // -----------------------------------------------------------------------------
@@ -625,8 +879,15 @@ function matchRoute(
 
 /**
  * Create and start the HTTP server.
+ * @param port - Port to listen on
+ * @param apiKey - Optional API key for cloud storage mode
  */
-export function startHttpServer(port: number): void {
+export function startHttpServer(port: number, apiKey?: string): void {
+  // Set cloud mode if API key provided
+  if (apiKey) {
+    setCloudApiKey(apiKey);
+  }
+
   const server = createServer(async (req, res) => {
     const url = new URL(req.url || "/", `http://localhost:${port}`);
     const pathname = url.pathname;
@@ -637,15 +898,16 @@ export function startHttpServer(port: number): void {
       return handleCors(res);
     }
 
-    // Health check
+    // Health check (always local)
     if (pathname === "/health" && method === "GET") {
-      return sendJson(res, 200, { status: "ok" });
+      return sendJson(res, 200, { status: "ok", mode: isCloudMode() ? "cloud" : "local" });
     }
 
-    // Status endpoint - returns server capabilities and active listeners
+    // Status endpoint (always local)
     if (pathname === "/status" && method === "GET") {
       const webhookUrls = getWebhookUrls();
       return sendJson(res, 200, {
+        mode: isCloudMode() ? "cloud" : "local",
         webhooksConfigured: webhookUrls.length > 0,
         webhookCount: webhookUrls.length,
         activeListeners: sseConnections.size,
@@ -653,7 +915,17 @@ export function startHttpServer(port: number): void {
       });
     }
 
-    // Match route
+    // MCP protocol endpoint (always local - allows Claude Code to connect)
+    if (pathname === "/mcp") {
+      return handleMcp(req, res);
+    }
+
+    // Cloud mode: proxy all other requests to cloud API
+    if (isCloudMode()) {
+      return proxyToCloud(req, res, pathname + url.search);
+    }
+
+    // Local mode: use local store
     const match = matchRoute(method, pathname);
     if (!match) {
       return sendError(res, 404, "Not found");
@@ -668,6 +940,10 @@ export function startHttpServer(port: number): void {
   });
 
   server.listen(port, () => {
-    console.log(`[HTTP] Agentation server listening on http://localhost:${port}`);
+    if (isCloudMode()) {
+      console.log(`[HTTP] Agentation server listening on http://localhost:${port} (cloud mode)`);
+    } else {
+      console.log(`[HTTP] Agentation server listening on http://localhost:${port}`);
+    }
   });
 }

@@ -1,16 +1,16 @@
 /**
- * Agentation CLI
+ * Agentation MCP CLI
  *
  * Usage:
- *   npx agentation server [--port 4747]
- *   npx agentation init
- *   npx agentation doctor
+ *   agentation-mcp server [--port 4747]
+ *   agentation-mcp init
+ *   agentation-mcp doctor
  */
 
 import * as readline from "readline";
 import * as fs from "fs";
 import * as path from "path";
-import { spawn, execSync } from "child_process";
+import { spawn } from "child_process";
 
 const command = process.argv[2];
 
@@ -29,27 +29,11 @@ async function runInit() {
 
   console.log(`
 ╔═══════════════════════════════════════════════════════════════╗
-║                    Agentation Setup Wizard                     ║
+║                 Agentation MCP Setup Wizard                    ║
 ╚═══════════════════════════════════════════════════════════════╝
 `);
 
-  // Step 1: Detect project
-  const cwd = process.cwd();
-  const hasPackageJson = fs.existsSync(path.join(cwd, "package.json"));
-  const hasNextConfig =
-    fs.existsSync(path.join(cwd, "next.config.js")) ||
-    fs.existsSync(path.join(cwd, "next.config.mjs")) ||
-    fs.existsSync(path.join(cwd, "next.config.ts"));
-
-  console.log(`📁 Project directory: ${cwd}`);
-  if (hasNextConfig) {
-    console.log(`   Detected: Next.js project`);
-  } else if (hasPackageJson) {
-    console.log(`   Detected: Node.js project`);
-  }
-  console.log();
-
-  // Step 2: Check Claude Code config
+  // Step 1: Check Claude Code config
   const homeDir = process.env.HOME || process.env.USERPROFILE || "";
   const claudeConfigPath = path.join(homeDir, ".claude", "claude_code_config.json");
   const hasClaudeConfig = fs.existsSync(claudeConfigPath);
@@ -61,7 +45,7 @@ async function runInit() {
   }
   console.log();
 
-  // Step 3: Ask about MCP server
+  // Step 2: Ask about MCP server
   console.log(`The Agentation MCP server allows Claude Code to receive`);
   console.log(`real-time annotations and respond to feedback.`);
   console.log();
@@ -93,8 +77,8 @@ async function runInit() {
 
     // Add agentation server
     (config.mcpServers as Record<string, unknown>).agentation = {
-      command: "npx",
-      args: port === 4747 ? ["agentation", "server"] : ["agentation", "server", "--port", String(port)],
+      command: "agentation-mcp",
+      args: port === 4747 ? ["server"] : ["server", "--port", String(port)],
     };
 
     // Ensure directory exists
@@ -108,15 +92,6 @@ async function runInit() {
     console.log(`✓ Updated ${claudeConfigPath}`);
     console.log();
 
-    // Show React component setup
-    console.log(`Next, add the component to your app:`);
-    console.log();
-    console.log(`  import { PageToolbar } from "agentation";`);
-    console.log();
-    console.log(`  // In your layout or app component:`);
-    console.log(`  <PageToolbar endpoint="http://localhost:${port}" />`);
-    console.log();
-
     // Test connection
     const testNow = await question(`Start server and test connection? [Y/n] `);
     if (testNow.toLowerCase() !== "n") {
@@ -124,7 +99,7 @@ async function runInit() {
       console.log(`Starting server on port ${port}...`);
 
       // Start server in background
-      const server = spawn("npx", ["agentation", "server", "--port", String(port)], {
+      const server = spawn("agentation-mcp", ["server", "--port", String(port)], {
         stdio: "inherit",
         detached: false,
       });
@@ -156,7 +131,7 @@ async function runInit() {
   }
 
   console.log();
-  console.log(`Setup complete! Run 'npx agentation doctor' to verify your setup.`);
+  console.log(`Setup complete! Run 'agentation-mcp doctor' to verify your setup.`);
   rl.close();
 }
 
@@ -167,7 +142,7 @@ async function runInit() {
 async function runDoctor() {
   console.log(`
 ╔═══════════════════════════════════════════════════════════════╗
-║                    Agentation Doctor                           ║
+║                    Agentation MCP Doctor                       ║
 ╚═══════════════════════════════════════════════════════════════╝
 `);
 
@@ -184,16 +159,7 @@ async function runDoctor() {
     allPassed = false;
   }
 
-  // Check 2: Package installed
-  const cwd = process.cwd();
-  const nodeModulesPath = path.join(cwd, "node_modules", "agentation");
-  if (fs.existsSync(nodeModulesPath)) {
-    results.push({ name: "Package installed", status: "pass", message: "agentation in node_modules" });
-  } else {
-    results.push({ name: "Package installed", status: "warn", message: "Not in current project's node_modules" });
-  }
-
-  // Check 3: Claude Code config
+  // Check 2: Claude Code config
   const homeDir = process.env.HOME || process.env.USERPROFILE || "";
   const claudeConfigPath = path.join(homeDir, ".claude", "claude_code_config.json");
   if (fs.existsSync(claudeConfigPath)) {
@@ -212,7 +178,7 @@ async function runDoctor() {
     results.push({ name: "Claude Code config", status: "warn", message: "No config found at ~/.claude/claude_code_config.json" });
   }
 
-  // Check 4: Server connectivity (try default port)
+  // Check 3: Server connectivity (try default port)
   try {
     const response = await fetch("http://localhost:4747/health", { signal: AbortSignal.timeout(2000) });
     if (response.ok) {
@@ -221,7 +187,7 @@ async function runDoctor() {
       results.push({ name: "Server (port 4747)", status: "warn", message: `Responded with ${response.status}` });
     }
   } catch {
-    results.push({ name: "Server (port 4747)", status: "warn", message: "Not running (start with: npx agentation server)" });
+    results.push({ name: "Server (port 4747)", status: "warn", message: "Not running (start with: agentation-mcp server)" });
   }
 
   // Print results
@@ -235,7 +201,7 @@ async function runDoctor() {
   if (allPassed) {
     console.log(`All checks passed!`);
   } else {
-    console.log(`Some checks failed. Run 'npx agentation init' to fix.`);
+    console.log(`Some checks failed. Run 'agentation-mcp init' to fix.`);
     process.exit(1);
   }
 }
@@ -256,35 +222,66 @@ if (command === "init") {
   });
 } else if (command === "server") {
   // Dynamic import to avoid loading server code for other commands
-  import("./server/index.js").then(({ startHttpServer, startMcpServer }) => {
+  import("./server/index.js").then(({ startHttpServer, startMcpServer, setApiKey }) => {
     const args = process.argv.slice(3);
     let port = 4747;
+    let mcpOnly = false;
+    let httpUrl = "http://localhost:4747";
+    let apiKeyArg: string | undefined;
 
     for (let i = 0; i < args.length; i++) {
       if (args[i] === "--port" && args[i + 1]) {
         const parsed = parseInt(args[i + 1], 10);
         if (!isNaN(parsed) && parsed > 0 && parsed < 65536) {
           port = parsed;
+          if (!args.includes("--http-url")) {
+            httpUrl = `http://localhost:${port}`;
+          }
         }
+        i++;
+      }
+      if (args[i] === "--mcp-only") {
+        mcpOnly = true;
+      }
+      if (args[i] === "--http-url" && args[i + 1]) {
+        httpUrl = args[i + 1];
+        i++;
+      }
+      if (args[i] === "--api-key" && args[i + 1]) {
+        apiKeyArg = args[i + 1];
         i++;
       }
     }
 
-    startHttpServer(port);
-    startMcpServer().catch((err) => {
+    // API key from flag or environment variable
+    const apiKey = apiKeyArg || process.env.AGENTATION_API_KEY;
+    if (apiKey) {
+      setApiKey(apiKey);
+    }
+
+    if (!mcpOnly) {
+      startHttpServer(port, apiKey);
+    }
+    startMcpServer(httpUrl).catch((err) => {
       console.error("MCP server error:", err);
       process.exit(1);
     });
   });
 } else if (command === "help" || command === "--help" || command === "-h" || !command) {
   console.log(`
-agentation - Visual feedback for AI coding agents
+agentation-mcp - MCP server for Agentation visual feedback
 
 Usage:
-  agentation init                    Interactive setup wizard
-  agentation server [--port <port>]  Start the annotation server (default: 4747)
-  agentation doctor                  Check your setup and diagnose issues
-  agentation help                    Show this help message
+  agentation-mcp init                    Interactive setup wizard
+  agentation-mcp server [options]        Start the annotation server
+  agentation-mcp doctor                  Check your setup and diagnose issues
+  agentation-mcp help                    Show this help message
+
+Server Options:
+  --port <port>      HTTP server port (default: 4747)
+  --mcp-only         Skip HTTP server, only run MCP on stdio
+  --http-url <url>   HTTP server URL for MCP to fetch from
+  --api-key <key>    API key for cloud storage (or set AGENTATION_API_KEY env var)
 
 Commands:
   init      Guided setup that configures Claude Code to use the MCP server.
@@ -296,18 +293,23 @@ Commands:
 
   doctor    Runs diagnostic checks on your setup:
             - Node.js version
-            - Package installation
             - Claude Code configuration
             - Server connectivity
 
 Examples:
-  npx agentation init                Set up Agentation in your project
-  npx agentation server              Start server on default port 4747
-  npx agentation server --port 8080  Start server on port 8080
-  npx agentation doctor              Check if everything is configured correctly
+  agentation-mcp init                Set up Agentation MCP
+  agentation-mcp server              Start server on default port 4747
+  agentation-mcp server --port 8080  Start server on port 8080
+  agentation-mcp doctor              Check if everything is configured correctly
+
+  # Use cloud storage with API key (local server proxies to cloud)
+  agentation-mcp server --api-key ag_xxx
+
+  # Or using environment variable
+  AGENTATION_API_KEY=ag_xxx agentation-mcp server
 `);
 } else {
   console.error(`Unknown command: ${command}`);
-  console.error("Run 'agentation help' for usage information.");
+  console.error("Run 'agentation-mcp help' for usage information.");
   process.exit(1);
 }

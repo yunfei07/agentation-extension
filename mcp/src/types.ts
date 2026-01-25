@@ -34,9 +34,6 @@ export type Annotation = {
   resolvedAt?: string;
   resolvedBy?: "human" | "agent";
   authorId?: string;
-
-  // Local-only sync tracking (not sent to server)
-  _syncedTo?: string; // Session ID this annotation was synced to
 };
 
 // -----------------------------------------------------------------------------
@@ -105,6 +102,50 @@ export type SAFEvent = {
   sessionId: string;
   sequence: number; // Monotonic for ordering/dedup/replay
   payload: Annotation | Session | ThreadMessage | ActionRequest;
+};
+
+// -----------------------------------------------------------------------------
+// Store Interface
+// -----------------------------------------------------------------------------
+
+// -----------------------------------------------------------------------------
+// Multi-Tenant Types
+// -----------------------------------------------------------------------------
+
+export type Organization = {
+  id: string;
+  name: string;
+  createdAt: string;
+  updatedAt?: string;
+};
+
+export type UserRole = "owner" | "admin" | "member";
+
+export type User = {
+  id: string;
+  email: string;
+  orgId: string;
+  role: UserRole;
+  createdAt: string;
+  updatedAt?: string;
+};
+
+export type ApiKey = {
+  id: string;
+  keyPrefix: string; // First 8 chars for display (e.g., "sk_live_a")
+  keyHash: string; // SHA-256 hash of full key
+  userId: string;
+  name: string;
+  createdAt: string;
+  expiresAt?: string;
+  lastUsedAt?: string;
+};
+
+export type UserContext = {
+  userId: string;
+  orgId: string;
+  email?: string;
+  role?: UserRole;
 };
 
 // -----------------------------------------------------------------------------

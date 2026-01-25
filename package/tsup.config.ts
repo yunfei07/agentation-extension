@@ -100,34 +100,4 @@ export default defineConfig((options) => [
       js: '"use client";',
     },
   },
-  // Server (MCP + HTTP)
-  {
-    entry: ["src/server/index.ts"],
-    format: ["cjs", "esm"],
-    dts: true,
-    splitting: false,
-    sourcemap: true,
-    clean: false,
-    external: ["@modelcontextprotocol/sdk", "zod"],
-    outDir: "dist/server",
-    define: {
-      __VERSION__: JSON.stringify(VERSION),
-    },
-  },
-  // CLI
-  {
-    entry: ["src/cli.ts"],
-    format: ["cjs"],
-    dts: false,
-    splitting: false,
-    sourcemap: true,
-    clean: false,
-    external: ["@modelcontextprotocol/sdk", "zod"],
-    define: {
-      __VERSION__: JSON.stringify(VERSION),
-    },
-    banner: {
-      js: "#!/usr/bin/env node",
-    },
-  },
 ]);
