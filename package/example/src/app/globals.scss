@@ -1086,3 +1086,16 @@ button {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.4; }
 }
+
+.show-on-mobile {
+  display: none;
+}
+
+@media (max-width: 600px) {
+  .hide-on-mobile {
+    display: none;
+  }
+  .show-on-mobile {
+    display: inline;
+  }
+}
