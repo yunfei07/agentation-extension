@@ -62,7 +62,6 @@ import {
 import {
   createSession,
   getSession,
-  listSessions,
   syncAnnotation,
   updateAnnotation as updateAnnotationOnServer,
   deleteAnnotation as deleteAnnotationFromServer,
@@ -70,7 +69,7 @@ import {
 } from "../../utils/sync";
 import { getReactComponentName } from "../../utils/react-detection";
 
-import type { Annotation, Session } from "../../types";
+import type { Annotation } from "../../types";
 import styles from "./styles.module.scss";
 
 /**
@@ -524,7 +523,6 @@ export function PageFeedbackToolbarCSS({
   const [connectionStatus, setConnectionStatus] = useState<"disconnected" | "connecting" | "connected">(
     endpoint ? "connecting" : "disconnected"
   );
-  const [availableSessions, setAvailableSessions] = useState<Session[]>([]);
 
   // Draggable toolbar state
   const [toolbarPosition, setToolbarPosition] = useState<{
@@ -837,29 +835,6 @@ export function PageFeedbackToolbarCSS({
     const interval = setInterval(checkHealth, 10000);
     return () => clearInterval(interval);
   }, [endpoint, mounted]);
-
-  // Fetch available sessions when connected
-  useEffect(() => {
-    if (!endpoint || connectionStatus !== "connected") return;
-
-    const fetchSessions = async () => {
-      try {
-        const sessions = await listSessions(endpoint);
-        // Sort by createdAt descending (newest first)
-        sessions.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-        setAvailableSessions(sessions);
-      } catch (error) {
-        console.warn("[Agentation] Failed to fetch sessions:", error);
-      }
-    };
-
-    // Fetch immediately on connection
-    fetchSessions();
-
-    // Refresh every 30 seconds while connected, or more frequently while panel is open
-    const interval = setInterval(fetchSessions, showSettings ? 10000 : 30000);
-    return () => clearInterval(interval);
-  }, [endpoint, connectionStatus, showSettings]);
 
   // Demo annotations
   useEffect(() => {
@@ -2724,73 +2699,6 @@ export function PageFeedbackToolbarCSS({
                 </div>
               )}
 
-              {/* Session Switcher - only show when connected */}
-              {endpoint && connectionStatus === "connected" && (
-                <div className={styles.settingsRow} style={{ marginTop: 4 }}>
-                  <div
-                    className={`${styles.settingsLabel} ${!isDarkMode ? styles.light : ""}`}
-                  >
-                    Session
-                    <span
-                      className={styles.helpIcon}
-                      data-tooltip="Switch between annotation sessions"
-                    >
-                      <IconHelp size={20} />
-                    </span>
-                  </div>
-                  <button
-                    className={`${styles.cycleButton} ${!isDarkMode ? styles.light : ""}`}
-                    disabled={availableSessions.length <= 1}
-                    onClick={async () => {
-                      if (availableSessions.length <= 1) return;
-                      const currentIndex = availableSessions.findIndex(
-                        (s) => s.id === currentSessionId,
-                      );
-                      const nextIndex =
-                        (currentIndex + 1) % availableSessions.length;
-                      const nextSession = availableSessions[nextIndex];
-
-                      try {
-                        const session = await getSession(endpoint, nextSession.id);
-                        setCurrentSessionId(session.id);
-                        setAnnotations(session.annotations);
-                        saveSessionId(pathname, session.id);
-                        saveAnnotationsWithSyncMarker(pathname, session.annotations, session.id);
-                      } catch (error) {
-                        console.warn("[Agentation] Failed to switch session:", error);
-                      }
-                    }}
-                  >
-                    <span
-                      key={currentSessionId}
-                      className={styles.cycleButtonText}
-                      title={availableSessions.find(s => s.id === currentSessionId)?.url}
-                    >
-                      {(() => {
-                        const session = availableSessions.find(s => s.id === currentSessionId);
-                        if (!session) return "Current";
-                        const path = truncateUrl(session.url);
-                        const time = formatRelativeTime(session.createdAt);
-                        // If path is just "/", show time as primary
-                        if (path === "/") return time;
-                        // Otherwise show path with time
-                        return `${path} · ${time}`;
-                      })()}
-                    </span>
-                    {availableSessions.length > 1 && (
-                      <span className={styles.cycleDots}>
-                        {availableSessions.slice(0, 4).map((session) => (
-                          <span
-                            key={session.id}
-                            className={`${styles.cycleDot} ${!isDarkMode ? styles.light : ""} ${session.id === currentSessionId ? styles.active : ""}`}
-                            title={`${truncateUrl(session.url)} (${formatRelativeTime(session.createdAt)})`}
-                          />
-                        ))}
-                      </span>
-                    )}
-                  </button>
-                </div>
-              )}
             </div>
 
             <div className={styles.settingsSection}>
