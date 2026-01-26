@@ -517,12 +517,12 @@ export function PageFeedbackToolbarCSS({
 
   // Server sync state
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(
-    initialSessionId ?? null
+    initialSessionId ?? null,
   );
   const sessionInitializedRef = useRef(false);
-  const [connectionStatus, setConnectionStatus] = useState<"disconnected" | "connecting" | "connected">(
-    endpoint ? "connecting" : "disconnected"
-  );
+  const [connectionStatus, setConnectionStatus] = useState<
+    "disconnected" | "connecting" | "connected"
+  >(endpoint ? "connecting" : "disconnected");
 
   // Draggable toolbar state
   const [toolbarPosition, setToolbarPosition] = useState<{
@@ -689,11 +689,14 @@ export function PageFeedbackToolbarCSS({
             // Only merge local annotations that haven't been synced to THIS session
             const unsyncedLocal = getUnsyncedAnnotations(pathname, session.id);
             const serverIds = new Set(session.annotations.map((a) => a.id));
-            const localToMerge = unsyncedLocal.filter((a) => !serverIds.has(a.id));
+            const localToMerge = unsyncedLocal.filter(
+              (a) => !serverIds.has(a.id),
+            );
 
             // Sync unsynced local annotations to this session
             if (localToMerge.length > 0) {
-              const baseUrl = typeof window !== "undefined" ? window.location.origin : "";
+              const baseUrl =
+                typeof window !== "undefined" ? window.location.origin : "";
               const pageUrl = `${baseUrl}${pathname}`;
 
               const results = await Promise.allSettled(
@@ -702,29 +705,46 @@ export function PageFeedbackToolbarCSS({
                     ...annotation,
                     sessionId: session.id,
                     url: pageUrl,
-                  })
-                )
+                  }),
+                ),
               );
 
               const syncedAnnotations = results.map((result, i) => {
                 if (result.status === "fulfilled") {
                   return result.value;
                 }
-                console.warn("[Agentation] Failed to sync annotation:", result.reason);
+                console.warn(
+                  "[Agentation] Failed to sync annotation:",
+                  result.reason,
+                );
                 return localToMerge[i];
               });
 
               // Mark merged annotations as synced
-              const allAnnotations = [...session.annotations, ...syncedAnnotations];
+              const allAnnotations = [
+                ...session.annotations,
+                ...syncedAnnotations,
+              ];
               setAnnotations(allAnnotations);
-              saveAnnotationsWithSyncMarker(pathname, allAnnotations, session.id);
+              saveAnnotationsWithSyncMarker(
+                pathname,
+                allAnnotations,
+                session.id,
+              );
             } else {
               setAnnotations(session.annotations);
-              saveAnnotationsWithSyncMarker(pathname, session.annotations, session.id);
+              saveAnnotationsWithSyncMarker(
+                pathname,
+                session.annotations,
+                session.id,
+              );
             }
           } catch (joinError) {
             // Session doesn't exist or expired - will create new below
-            console.warn("[Agentation] Could not join session, creating new:", joinError);
+            console.warn(
+              "[Agentation] Could not join session, creating new:",
+              joinError,
+            );
             // Clear the stored session ID since it's invalid
             clearSessionId(pathname);
             // sessionEstablished remains false, will create new session
@@ -734,7 +754,8 @@ export function PageFeedbackToolbarCSS({
         // Create new session if we don't have one yet (either no stored ID, or rejoin failed)
         if (!sessionEstablished) {
           // Create new session for current page
-          const currentUrl = typeof window !== "undefined" ? window.location.href : "/";
+          const currentUrl =
+            typeof window !== "undefined" ? window.location.href : "/";
           const session = await createSession(endpoint, currentUrl);
           setCurrentSessionId(session.id);
           setConnectionStatus("connected");
@@ -743,14 +764,15 @@ export function PageFeedbackToolbarCSS({
 
           // Only sync annotations that have never been synced (no _syncedTo marker)
           const allAnnotations = loadAllAnnotations<Annotation>();
-          const baseUrl = typeof window !== "undefined" ? window.location.origin : "";
+          const baseUrl =
+            typeof window !== "undefined" ? window.location.origin : "";
 
           // Sync annotations from all pages in parallel
           const syncPromises: Promise<void>[] = [];
           for (const [pagePath, annotations] of allAnnotations) {
             // Filter to only unsynced annotations
             const unsyncedAnnotations = annotations.filter(
-              (a) => !(a as Annotation & { _syncedTo?: string })._syncedTo
+              (a) => !(a as Annotation & { _syncedTo?: string })._syncedTo,
             );
             if (unsyncedAnnotations.length === 0) continue;
 
@@ -771,8 +793,8 @@ export function PageFeedbackToolbarCSS({
                         ...annotation,
                         sessionId: targetSession.id,
                         url: pageUrl,
-                      })
-                    )
+                      }),
+                    ),
                   );
 
                   // Mark synced annotations and update local state for current page
@@ -780,24 +802,38 @@ export function PageFeedbackToolbarCSS({
                     if (result.status === "fulfilled") {
                       return result.value;
                     }
-                    console.warn("[Agentation] Failed to sync annotation:", result.reason);
+                    console.warn(
+                      "[Agentation] Failed to sync annotation:",
+                      result.reason,
+                    );
                     return unsyncedAnnotations[i];
                   });
 
                   // Save with sync marker
-                  saveAnnotationsWithSyncMarker(pagePath, syncedAnnotations, targetSession.id);
+                  saveAnnotationsWithSyncMarker(
+                    pagePath,
+                    syncedAnnotations,
+                    targetSession.id,
+                  );
 
                   if (isCurrentPage) {
-                    const originalIds = new Set(unsyncedAnnotations.map((a) => a.id));
+                    const originalIds = new Set(
+                      unsyncedAnnotations.map((a) => a.id),
+                    );
                     setAnnotations((prev) => {
-                      const newDuringSync = prev.filter((a) => !originalIds.has(a.id));
+                      const newDuringSync = prev.filter(
+                        (a) => !originalIds.has(a.id),
+                      );
                       return [...syncedAnnotations, ...newDuringSync];
                     });
                   }
                 } catch (err) {
-                  console.warn(`[Agentation] Failed to sync annotations for ${pagePath}:`, err);
+                  console.warn(
+                    `[Agentation] Failed to sync annotations for ${pagePath}:`,
+                    err,
+                  );
                 }
-              })()
+              })(),
             );
           }
 
@@ -806,7 +842,10 @@ export function PageFeedbackToolbarCSS({
       } catch (error) {
         // Network error - continue in local-only mode
         setConnectionStatus("disconnected");
-        console.warn("[Agentation] Failed to initialize session, using local storage:", error);
+        console.warn(
+          "[Agentation] Failed to initialize session, using local storage:",
+          error,
+        );
       }
     };
 
@@ -1050,13 +1089,17 @@ export function PageFeedbackToolbarCSS({
         return;
       }
 
-      const { name, elementName, path, reactComponents } = identifyElementWithReact(
-        elementUnder,
-        effectiveReactMode,
-      );
+      const { name, elementName, path, reactComponents } =
+        identifyElementWithReact(elementUnder, effectiveReactMode);
       const rect = elementUnder.getBoundingClientRect();
 
-      setHoverInfo({ element: name, elementName, elementPath: path, rect, reactComponents });
+      setHoverInfo({
+        element: name,
+        elementName,
+        elementPath: path,
+        rect,
+        reactComponents,
+      });
       setHoverPosition({ x: e.clientX, y: e.clientY });
     };
 
@@ -1536,7 +1579,8 @@ export function PageFeedbackToolbarCSS({
           const firstElement = finalElements[0].element;
           const firstElementComputedStyles =
             getDetailedComputedStyles(firstElement);
-          const firstElementComputedStylesStr = getForensicComputedStyles(firstElement);
+          const firstElementComputedStylesStr =
+            getForensicComputedStyles(firstElement);
 
           setPendingAnnotation({
             x,
@@ -1613,7 +1657,8 @@ export function PageFeedbackToolbarCSS({
           body: JSON.stringify({
             event,
             timestamp: Date.now(),
-            url: typeof window !== "undefined" ? window.location.href : undefined,
+            url:
+              typeof window !== "undefined" ? window.location.href : undefined,
             ...payload,
           }),
         });
@@ -1652,7 +1697,10 @@ export function PageFeedbackToolbarCSS({
         ...(endpoint && currentSessionId
           ? {
               sessionId: currentSessionId,
-              url: typeof window !== "undefined" ? window.location.href : undefined,
+              url:
+                typeof window !== "undefined"
+                  ? window.location.href
+                  : undefined,
               status: "pending" as const,
             }
           : {}),
@@ -1690,8 +1738,10 @@ export function PageFeedbackToolbarCSS({
             if (serverAnnotation.id !== newAnnotation.id) {
               setAnnotations((prev) =>
                 prev.map((a) =>
-                  a.id === newAnnotation.id ? { ...a, id: serverAnnotation.id } : a
-                )
+                  a.id === newAnnotation.id
+                    ? { ...a, id: serverAnnotation.id }
+                    : a,
+                ),
               );
               // Also update the animated markers set
               setAnimatedMarkers((prev) => {
@@ -1707,7 +1757,13 @@ export function PageFeedbackToolbarCSS({
           });
       }
     },
-    [pendingAnnotation, onAnnotationAdd, fireWebhook, endpoint, currentSessionId],
+    [
+      pendingAnnotation,
+      onAnnotationAdd,
+      fireWebhook,
+      endpoint,
+      currentSessionId,
+    ],
   );
 
   // Cancel annotation with exit animation
@@ -1742,7 +1798,10 @@ export function PageFeedbackToolbarCSS({
       // Sync delete to server (non-blocking)
       if (endpoint) {
         deleteAnnotationFromServer(endpoint, id).catch((error) => {
-          console.warn("[Agentation] Failed to delete annotation from server:", error);
+          console.warn(
+            "[Agentation] Failed to delete annotation from server:",
+            error,
+          );
         });
       }
 
@@ -1763,7 +1822,7 @@ export function PageFeedbackToolbarCSS({
         }
       }, 150);
     },
-[annotations, editingAnnotation, onAnnotationDelete, fireWebhook, endpoint],
+    [annotations, editingAnnotation, onAnnotationDelete, fireWebhook, endpoint],
   );
 
   // Start editing an annotation (right-click)
@@ -1791,8 +1850,13 @@ export function PageFeedbackToolbarCSS({
 
       // Sync update to server (non-blocking)
       if (endpoint) {
-        updateAnnotationOnServer(endpoint, editingAnnotation.id, { comment: newComment }).catch((error) => {
-          console.warn("[Agentation] Failed to update annotation on server:", error);
+        updateAnnotationOnServer(endpoint, editingAnnotation.id, {
+          comment: newComment,
+        }).catch((error) => {
+          console.warn(
+            "[Agentation] Failed to update annotation on server:",
+            error,
+          );
         });
       }
 
@@ -1829,9 +1893,12 @@ export function PageFeedbackToolbarCSS({
       Promise.all(
         annotations.map((a) =>
           deleteAnnotationFromServer(endpoint, a.id).catch((error) => {
-            console.warn("[Agentation] Failed to delete annotation from server:", error);
-          })
-        )
+            console.warn(
+              "[Agentation] Failed to delete annotation from server:",
+              error,
+            );
+          }),
+        ),
       );
     }
 
@@ -1851,7 +1918,12 @@ export function PageFeedbackToolbarCSS({
 
   // Copy output
   const copyOutput = useCallback(async () => {
-    const output = generateOutput(annotations, pathname, settings.outputDetail, effectiveReactMode);
+    const output = generateOutput(
+      annotations,
+      pathname,
+      settings.outputDetail,
+      effectiveReactMode,
+    );
     if (!output) return;
 
     if (copyToClipboard) {
@@ -1883,12 +1955,21 @@ export function PageFeedbackToolbarCSS({
   ]);
 
   // Track delivery status for better feedback
-  const [lastDelivery, setLastDelivery] = useState<{ total: number; sseListeners: number; webhooks: number } | null>(null);
+  const [lastDelivery, setLastDelivery] = useState<{
+    total: number;
+    sseListeners: number;
+    webhooks: number;
+  } | null>(null);
   const [sendFailed, setSendFailed] = useState(false);
 
   // Send to agent (triggers action.requested event)
   const sendToAgent = useCallback(async () => {
-    const output = generateOutput(annotations, pathname, settings.outputDetail, effectiveReactMode);
+    const output = generateOutput(
+      annotations,
+      pathname,
+      settings.outputDetail,
+      effectiveReactMode,
+    );
     if (!output) return;
 
     // Fire onSubmit callback regardless of server connection
@@ -2228,13 +2309,19 @@ export function PageFeedbackToolbarCSS({
           {/* Controls content - visible when expanded */}
           <div
             className={`${styles.controlsContent} ${isActive ? styles.visible : styles.hidden} ${
-              toolbarPosition && toolbarPosition.y < 100 ? styles.tooltipBelow : ""
+              toolbarPosition && toolbarPosition.y < 100
+                ? styles.tooltipBelow
+                : ""
             } ${tooltipsHidden || showSettings ? styles.tooltipsHidden : ""}`}
             onMouseLeave={showTooltipsAgain}
           >
-            <div className={`${styles.buttonWrapper} ${
-              toolbarPosition && toolbarPosition.x < 120 ? styles.buttonWrapperAlignLeft : ""
-            }`}>
+            <div
+              className={`${styles.buttonWrapper} ${
+                toolbarPosition && toolbarPosition.x < 120
+                  ? styles.buttonWrapperAlignLeft
+                  : ""
+              }`}
+            >
               <button
                 className={`${styles.controlButton} ${!isDarkMode ? styles.light : ""}`}
                 onClick={(e) => {
@@ -2290,7 +2377,9 @@ export function PageFeedbackToolbarCSS({
             </div>
 
             {/* Sync button - auto-synced state for Claude Code, clickable for Manual/Custom/onSubmit */}
-            <div className={`${styles.buttonWrapper} ${styles.sendButtonWrapper} ${connectionStatus === "connected" || onSubmit ? styles.sendButtonVisible : ""}`}>
+            <div
+              className={`${styles.buttonWrapper} ${styles.sendButtonWrapper} ${connectionStatus === "connected" || onSubmit ? styles.sendButtonVisible : ""}`}
+            >
               <button
                 className={`${styles.controlButton} ${!isDarkMode ? styles.light : ""}`}
                 onClick={(e) => {
@@ -2299,27 +2388,43 @@ export function PageFeedbackToolbarCSS({
                     sendToAgent();
                   }
                 }}
-                disabled={!hasAnnotations && settings.agentMode !== "claude-code"}
+                disabled={
+                  !hasAnnotations && settings.agentMode !== "claude-code"
+                }
                 data-active={sent || settings.agentMode === "claude-code"}
                 data-auto-sync={settings.agentMode === "claude-code"}
                 data-failed={sendFailed}
                 tabIndex={connectionStatus === "connected" || onSubmit ? 0 : -1}
               >
-                <IconSendAnimated size={24} sent={sent || settings.agentMode === "claude-code"} />
-                {hasAnnotations && !sent && !sendFailed && settings.agentMode !== "claude-code" && (
-                  <span className={`${styles.buttonBadge} ${!isDarkMode ? styles.light : ""}`}>{annotations.length}</span>
-                )}
+                <IconSendAnimated
+                  size={24}
+                  sent={sent || settings.agentMode === "claude-code"}
+                />
+                {hasAnnotations &&
+                  !sent &&
+                  !sendFailed &&
+                  settings.agentMode !== "claude-code" && (
+                    <span
+                      className={`${styles.buttonBadge} ${!isDarkMode ? styles.light : ""}`}
+                    >
+                      {annotations.length}
+                    </span>
+                  )}
               </button>
-              <span className={`${styles.buttonTooltip} ${sent || sendFailed ? styles.tooltipVisible : ""}`}>
+              <span
+                className={`${styles.buttonTooltip} ${sent || sendFailed ? styles.tooltipVisible : ""}`}
+              >
                 {settings.agentMode === "claude-code"
                   ? "Auto-synced"
                   : sendFailed
                     ? "No listeners"
                     : sent
-                      ? (settings.agentMode === "custom"
-                          ? `Sent to ${lastDelivery?.webhooks || 0} webhook${lastDelivery?.webhooks === 1 ? "" : "s"}`
-                          : "Sent!")
-                      : (settings.agentMode === "custom" ? "Trigger webhooks" : "Send to agent")}
+                      ? settings.agentMode === "custom"
+                        ? `Sent to ${lastDelivery?.webhooks || 0} webhook${lastDelivery?.webhooks === 1 ? "" : "s"}`
+                        : "Sent!"
+                      : settings.agentMode === "custom"
+                        ? "Trigger webhooks"
+                        : "Send to agent"}
               </span>
             </div>
 
@@ -2353,18 +2458,22 @@ export function PageFeedbackToolbarCSS({
               >
                 <IconGear size={24} />
               </button>
-              <span className={styles.buttonTooltip}>
-                Settings
-              </span>
+              <span className={styles.buttonTooltip}>Settings</span>
             </div>
 
             <div
               className={`${styles.divider} ${!isDarkMode ? styles.light : ""}`}
             />
 
-            <div className={`${styles.buttonWrapper} ${
-              toolbarPosition && typeof window !== "undefined" && toolbarPosition.x > window.innerWidth - 120 ? styles.buttonWrapperAlignRight : ""
-            }`}>
+            <div
+              className={`${styles.buttonWrapper} ${
+                toolbarPosition &&
+                typeof window !== "undefined" &&
+                toolbarPosition.x > window.innerWidth - 120
+                  ? styles.buttonWrapperAlignRight
+                  : ""
+              }`}
+            >
               <button
                 className={`${styles.controlButton} ${!isDarkMode ? styles.light : ""}`}
                 onClick={(e) => {
@@ -2487,12 +2596,19 @@ export function PageFeedbackToolbarCSS({
                     <IconHelp size={20} />
                   </span>
                 </div>
-                <label className={`${styles.toggleSwitch} ${!isLocalhost ? styles.disabled : ""}`}>
+                <label
+                  className={`${styles.toggleSwitch} ${!isLocalhost ? styles.disabled : ""}`}
+                >
                   <input
                     type="checkbox"
                     checked={isLocalhost && settings.reactEnabled}
                     disabled={!isLocalhost}
-                    onChange={() => setSettings((s) => ({ ...s, reactEnabled: !s.reactEnabled }))}
+                    onChange={() =>
+                      setSettings((s) => ({
+                        ...s,
+                        reactEnabled: !s.reactEnabled,
+                      }))
+                    }
                   />
                   <span className={styles.toggleSlider} />
                 </label>
@@ -2556,7 +2672,8 @@ export function PageFeedbackToolbarCSS({
                       (currentIndex + 1) % MARKER_CLICK_OPTIONS.length;
                     setSettings((s) => ({
                       ...s,
-                      markerClickBehavior: MARKER_CLICK_OPTIONS[nextIndex].value,
+                      markerClickBehavior:
+                        MARKER_CLICK_OPTIONS[nextIndex].value,
                     }));
                   }}
                 >
@@ -2564,9 +2681,11 @@ export function PageFeedbackToolbarCSS({
                     key={settings.markerClickBehavior}
                     className={styles.cycleButtonText}
                   >
-                    {MARKER_CLICK_OPTIONS.find(
-                      (opt) => opt.value === settings.markerClickBehavior,
-                    )?.label}
+                    {
+                      MARKER_CLICK_OPTIONS.find(
+                        (opt) => opt.value === settings.markerClickBehavior,
+                      )?.label
+                    }
                   </span>
                   <span className={styles.cycleDots}>
                     {MARKER_CLICK_OPTIONS.map((option) => (
@@ -2692,13 +2811,17 @@ export function PageFeedbackToolbarCSS({
                     <input
                       type="checkbox"
                       checked={settings.webhooksEnabled}
-                      onChange={() => setSettings((s) => ({ ...s, webhooksEnabled: !s.webhooksEnabled }))}
+                      onChange={() =>
+                        setSettings((s) => ({
+                          ...s,
+                          webhooksEnabled: !s.webhooksEnabled,
+                        }))
+                      }
                     />
                     <span className={styles.toggleSlider} />
                   </label>
                 </div>
               )}
-
             </div>
 
             <div className={styles.settingsSection}>
@@ -2774,7 +2897,8 @@ export function PageFeedbackToolbarCSS({
               const isHovered =
                 !markersExiting && hoveredMarkerId === annotation.id;
               const isDeleting = deletingMarkerId === annotation.id;
-              const showDeleteState = (isHovered || isDeleting) && !editingAnnotation;
+              const showDeleteState =
+                (isHovered || isDeleting) && !editingAnnotation;
               const isMulti = annotation.isMultiSelect;
               const markerColor = isMulti
                 ? "#34C759"
@@ -2791,7 +2915,8 @@ export function PageFeedbackToolbarCSS({
                     ? styles.enter
                     : "";
 
-              const showDeleteHover = showDeleteState && settings.markerClickBehavior === "delete";
+              const showDeleteHover =
+                showDeleteState && settings.markerClickBehavior === "delete";
               return (
                 <div
                   key={annotation.id}
@@ -2813,7 +2938,10 @@ export function PageFeedbackToolbarCSS({
                   onMouseLeave={() => setHoveredMarkerId(null)}
                   onClick={(e) => {
                     e.stopPropagation();
-                    console.log("Marker clicked, behavior:", settings.markerClickBehavior);
+                    console.log(
+                      "Marker clicked, behavior:",
+                      settings.markerClickBehavior,
+                    );
                     if (!markersExiting) {
                       if (settings.markerClickBehavior === "delete") {
                         console.log("Deleting annotation");
@@ -2833,7 +2961,11 @@ export function PageFeedbackToolbarCSS({
                   }}
                 >
                   {showDeleteState ? (
-                    showDeleteHover ? <IconXmark size={isMulti ? 18 : 16} /> : <IconEdit size={16} />
+                    showDeleteHover ? (
+                      <IconXmark size={isMulti ? 18 : 16} />
+                    ) : (
+                      <IconEdit size={16} />
+                    )
                   ) : (
                     <span
                       className={
@@ -2899,7 +3031,8 @@ export function PageFeedbackToolbarCSS({
               const isHovered =
                 !markersExiting && hoveredMarkerId === annotation.id;
               const isDeleting = deletingMarkerId === annotation.id;
-              const showDeleteState = (isHovered || isDeleting) && !editingAnnotation;
+              const showDeleteState =
+                (isHovered || isDeleting) && !editingAnnotation;
               const isMulti = annotation.isMultiSelect;
               const markerColor = isMulti
                 ? "#34C759"
@@ -2916,7 +3049,8 @@ export function PageFeedbackToolbarCSS({
                     ? styles.enter
                     : "";
 
-              const showDeleteHover = showDeleteState && settings.markerClickBehavior === "delete";
+              const showDeleteHover =
+                showDeleteState && settings.markerClickBehavior === "delete";
               return (
                 <div
                   key={annotation.id}
@@ -2938,7 +3072,10 @@ export function PageFeedbackToolbarCSS({
                   onMouseLeave={() => setHoveredMarkerId(null)}
                   onClick={(e) => {
                     e.stopPropagation();
-                    console.log("Marker clicked, behavior:", settings.markerClickBehavior);
+                    console.log(
+                      "Marker clicked, behavior:",
+                      settings.markerClickBehavior,
+                    );
                     if (!markersExiting) {
                       if (settings.markerClickBehavior === "delete") {
                         console.log("Deleting annotation");
@@ -2958,7 +3095,11 @@ export function PageFeedbackToolbarCSS({
                   }}
                 >
                   {showDeleteState ? (
-                    showDeleteHover ? <IconXmark size={isMulti ? 18 : 16} /> : <IconEdit size={16} />
+                    showDeleteHover ? (
+                      <IconXmark size={isMulti ? 18 : 16} />
+                    ) : (
+                      <IconEdit size={16} />
+                    )
                   ) : (
                     <span
                       className={
@@ -3079,13 +3220,20 @@ export function PageFeedbackToolbarCSS({
                   8,
                   Math.min(hoverPosition.x, window.innerWidth - 100),
                 ),
-                top: Math.max(hoverPosition.y - (hoverInfo.reactComponents ? 48 : 32), 8),
+                top: Math.max(
+                  hoverPosition.y - (hoverInfo.reactComponents ? 48 : 32),
+                  8,
+                ),
               }}
             >
               {hoverInfo.reactComponents && (
-                <div className={styles.hoverReactPath}>{hoverInfo.reactComponents}</div>
+                <div className={styles.hoverReactPath}>
+                  {hoverInfo.reactComponents}
+                </div>
               )}
-              <div className={styles.hoverElementName}>{hoverInfo.elementName}</div>
+              <div className={styles.hoverElementName}>
+                {hoverInfo.elementName}
+              </div>
             </div>
           )}
 
@@ -3157,7 +3305,10 @@ export function PageFeedbackToolbarCSS({
                   ),
                   // Position popup above or below marker to keep marker visible
                   ...(pendingAnnotation.clientY > window.innerHeight - 290
-                    ? { bottom: window.innerHeight - pendingAnnotation.clientY + 20 }
+                    ? {
+                        bottom:
+                          window.innerHeight - pendingAnnotation.clientY + 20,
+                      }
                     : { top: pendingAnnotation.clientY + 20 }),
                 }}
               />
@@ -3190,7 +3341,9 @@ export function PageFeedbackToolbarCSS({
                 ref={editPopupRef}
                 element={editingAnnotation.element}
                 selectedText={editingAnnotation.selectedText}
-                computedStyles={parseComputedStylesString(editingAnnotation.computedStyles)}
+                computedStyles={parseComputedStylesString(
+                  editingAnnotation.computedStyles,
+                )}
                 placeholder="Edit your feedback..."
                 initialValue={editingAnnotation.comment}
                 submitLabel="Save"
@@ -3240,7 +3393,6 @@ export function PageFeedbackToolbarCSS({
           )}
         </div>
       )}
-
     </>,
     document.body,
   );

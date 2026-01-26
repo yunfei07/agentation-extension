@@ -304,7 +304,6 @@ $green: #34c759;
     opacity: 0;
     filter: blur(10px);
     transform: scale(0.4);
-    pointer-events: none;
   }
 }
 
@@ -360,7 +359,9 @@ $green: #34c759;
     transform 0.1s ease,
     opacity 0.2s ease;
 
-  &:hover:not(:disabled):not([data-active="true"]):not([data-failed="true"]):not([data-auto-sync="true"]) {
+  &:hover:not(:disabled):not([data-active="true"]):not(
+      [data-failed="true"]
+    ):not([data-auto-sync="true"]) {
     background: rgba(255, 255, 255, 0.12);
     color: #fff;
   }
@@ -379,7 +380,9 @@ $green: #34c759;
     background: rgba($blue, 0.25);
   }
 
-  &[data-danger]:hover:not(:disabled):not([data-active="true"]):not([data-failed="true"]) {
+  &[data-danger]:hover:not(:disabled):not([data-active="true"]):not(
+      [data-failed="true"]
+    ) {
     background: rgba($red, 0.25);
     color: $red;
   }
@@ -427,7 +430,8 @@ $green: #34c759;
 
 // Connection status indicator
 @keyframes connectionPulse {
-  0%, 100% {
+  0%,
+  100% {
     opacity: 1;
     transform: scale(1);
   }
@@ -450,7 +454,9 @@ $green: #34c759;
   height: 8px;
   border-radius: 50%;
   opacity: 0;
-  transition: opacity 0.3s ease, background 0.3s ease;
+  transition:
+    opacity 0.3s ease,
+    background 0.3s ease;
   cursor: default;
 }
 
@@ -523,7 +529,6 @@ $green: #34c759;
     }
   }
 }
-
 
 // Toolbar Button Tooltips
 .buttonTooltip {
@@ -1716,7 +1721,9 @@ $green: #34c759;
   &.controlButton {
     color: rgba(0, 0, 0, 0.5);
 
-    &:hover:not(:disabled):not([data-active="true"]):not([data-failed="true"]):not([data-auto-sync="true"]) {
+    &:hover:not(:disabled):not([data-active="true"]):not(
+        [data-failed="true"]
+      ):not([data-auto-sync="true"]) {
       background: rgba(0, 0, 0, 0.06);
       color: rgba(0, 0, 0, 0.85);
     }
@@ -1726,7 +1733,9 @@ $green: #34c759;
       background: rgba($blue, 0.15);
     }
 
-    &[data-danger]:hover:not(:disabled):not([data-active="true"]):not([data-failed="true"]) {
+    &[data-danger]:hover:not(:disabled):not([data-active="true"]):not(
+        [data-failed="true"]
+      ) {
       background: rgba($red, 0.15);
       color: $red;
     }
