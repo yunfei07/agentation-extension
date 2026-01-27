@@ -2,8 +2,62 @@
 // Element Identification Utilities
 // =============================================================================
 
+// =============================================================================
+// Shadow DOM Helpers
+// =============================================================================
+
+/**
+ * Gets the parent element, crossing shadow DOM boundaries.
+ * When inside a shadow root with no parentElement, returns the shadow host.
+ */
+function getParentElement(element: Element): Element | null {
+  if (element.parentElement) {
+    return element.parentElement;
+  }
+  const root = element.getRootNode();
+  if (root instanceof ShadowRoot) {
+    return root.host;
+  }
+  return null;
+}
+
+/**
+ * Finds the closest ancestor matching a selector, crossing shadow DOM boundaries.
+ */
+export function closestCrossingShadow(element: Element, selector: string): Element | null {
+  let current: Element | null = element;
+  while (current) {
+    if (current.matches(selector)) return current;
+    current = getParentElement(current);
+  }
+  return null;
+}
+
+/**
+ * Checks if an element is inside a shadow DOM
+ */
+export function isInShadowDOM(element: Element): boolean {
+  return element.getRootNode() instanceof ShadowRoot;
+}
+
+/**
+ * Gets the shadow host for an element, or null if not in shadow DOM
+ */
+export function getShadowHost(element: Element): Element | null {
+  const root = element.getRootNode();
+  if (root instanceof ShadowRoot) {
+    return root.host;
+  }
+  return null;
+}
+
+// =============================================================================
+// Element Path Utilities
+// =============================================================================
+
 /**
  * Gets a readable path for an element (e.g., "article > section > p")
+ * Supports elements inside shadow DOM by crossing shadow boundaries.
  */
 export function getElementPath(target: HTMLElement, maxDepth = 4): string {
   const parts: string[] = [];
@@ -29,8 +83,14 @@ export function getElementPath(target: HTMLElement, maxDepth = 4): string {
       }
     }
 
+    // Mark shadow boundary crossings
+    const nextParent = getParentElement(current);
+    if (!current.parentElement && nextParent) {
+      identifier = `⟨shadow⟩ ${identifier}`;
+    }
+
     parts.unshift(identifier);
-    current = current.parentElement;
+    current = nextParent as HTMLElement | null;
     depth++;
   }
 
@@ -51,11 +111,11 @@ export function identifyElement(target: HTMLElement): { name: string; path: stri
 
   // SVG elements
   if (["path", "circle", "rect", "line", "g"].includes(tag)) {
-    // Try to find parent SVG context
-    const svg = target.closest("svg");
+    // Try to find parent SVG context (crossing shadow boundaries)
+    const svg = closestCrossingShadow(target, "svg");
     if (svg) {
-      const parent = svg.parentElement;
-      if (parent) {
+      const parent = getParentElement(svg);
+      if (parent instanceof HTMLElement) {
         const parentName = identifyElement(parent).name;
         return { name: `graphic in ${parentName}`, path };
       }
@@ -63,7 +123,7 @@ export function identifyElement(target: HTMLElement): { name: string; path: stri
     return { name: "graphic element", path };
   }
   if (tag === "svg") {
-    const parent = target.parentElement;
+    const parent = getParentElement(target);
     if (parent?.tagName.toLowerCase() === "button") {
       const btnText = parent.textContent?.trim();
       return { name: btnText ? `icon in "${btnText}" button` : "button icon", path };
@@ -244,13 +304,20 @@ export function identifyAnimationElement(target: HTMLElement): string {
 }
 
 /**
- * Gets nearby sibling elements for structural context
+ * Gets nearby sibling elements for structural context.
+ * Supports elements inside shadow DOM.
  */
 export function getNearbyElements(element: HTMLElement): string {
-  const parent = element.parentElement;
+  const parent = getParentElement(element);
   if (!parent) return "";
 
-  const siblings = Array.from(parent.children).filter(
+  // Get siblings from the correct source
+  const elementRoot = element.getRootNode();
+  const children = (elementRoot instanceof ShadowRoot && element.parentElement)
+    ? Array.from(element.parentElement.children)
+    : Array.from(parent.children);
+
+  const siblings = children.filter(
     (child) => child !== element && child instanceof HTMLElement
   ) as HTMLElement[];
 
@@ -513,7 +580,8 @@ export function getAccessibilityInfo(target: HTMLElement): string {
 }
 
 /**
- * Gets full DOM ancestry path (for forensic mode)
+ * Gets full DOM ancestry path (for forensic mode).
+ * Supports elements inside shadow DOM by marking shadow boundary crossings.
  */
 export function getFullElementPath(target: HTMLElement): string {
   const parts: string[] = [];
@@ -533,8 +601,14 @@ export function getFullElementPath(target: HTMLElement): string {
       if (cls) identifier = `${tag}.${cls}`;
     }
 
+    // Mark shadow boundary crossings
+    const nextParent = getParentElement(current);
+    if (!current.parentElement && nextParent) {
+      identifier = `⟨shadow⟩ ${identifier}`;
+    }
+
     parts.unshift(identifier);
-    current = current.parentElement;
+    current = nextParent as HTMLElement | null;
   }
 
   return parts.join(" > ");

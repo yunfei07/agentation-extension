@@ -49,6 +49,7 @@ import {
   getFullElementPath,
   getAccessibilityInfo,
   getNearbyElements,
+  closestCrossingShadow,
 } from "../../utils/element-identification";
 import {
   loadAnnotations,
@@ -197,6 +198,25 @@ const COLOR_OPTIONS = [
 // =============================================================================
 // Utils
 // =============================================================================
+
+/**
+ * Recursively pierces shadow DOMs to find the deepest element at a point.
+ * document.elementFromPoint() stops at shadow hosts, so we need to
+ * recursively check inside open shadow roots to find the actual target.
+ */
+function deepElementFromPoint(x: number, y: number): HTMLElement | null {
+  let element = document.elementFromPoint(x, y) as HTMLElement | null;
+  if (!element) return null;
+
+  // Keep drilling down through shadow roots
+  while (element?.shadowRoot) {
+    const deeper = element.shadowRoot.elementFromPoint(x, y) as HTMLElement | null;
+    if (!deeper || deeper === element) break;
+    element = deeper;
+  }
+
+  return element;
+}
 
 function isElementFixed(element: HTMLElement): boolean {
   let current: HTMLElement | null = element;
@@ -1229,16 +1249,18 @@ export function PageFeedbackToolbarCSS({
     if (!isActive || pendingAnnotation) return;
 
     const handleMouseMove = (e: MouseEvent) => {
-      if ((e.target as HTMLElement).closest("[data-feedback-toolbar]")) {
+      if (
+        closestCrossingShadow(e.target as HTMLElement, "[data-feedback-toolbar]")
+      ) {
         setHoverInfo(null);
         return;
       }
 
-      const elementUnder = document.elementFromPoint(
-        e.clientX,
-        e.clientY,
-      ) as HTMLElement;
-      if (!elementUnder || elementUnder.closest("[data-feedback-toolbar]")) {
+      const elementUnder = deepElementFromPoint(e.clientX, e.clientY);
+      if (
+        !elementUnder ||
+        closestCrossingShadow(elementUnder, "[data-feedback-toolbar]")
+      ) {
         setHoverInfo(null);
         return;
       }
@@ -1273,11 +1295,12 @@ export function PageFeedbackToolbarCSS({
 
       const target = e.target as HTMLElement;
 
-      if (target.closest("[data-feedback-toolbar]")) return;
-      if (target.closest("[data-annotation-popup]")) return;
-      if (target.closest("[data-annotation-marker]")) return;
+      if (closestCrossingShadow(target, "[data-feedback-toolbar]")) return;
+      if (closestCrossingShadow(target, "[data-annotation-popup]")) return;
+      if (closestCrossingShadow(target, "[data-annotation-marker]")) return;
 
-      const isInteractive = target.closest(
+      const isInteractive = closestCrossingShadow(
+        target,
         "button, a, input, select, textarea, [role='button'], [onclick]",
       );
 
@@ -1308,10 +1331,7 @@ export function PageFeedbackToolbarCSS({
 
       e.preventDefault();
 
-      const elementUnder = document.elementFromPoint(
-        e.clientX,
-        e.clientY,
-      ) as HTMLElement;
+      const elementUnder = deepElementFromPoint(e.clientX, e.clientY);
       if (!elementUnder) return;
 
       const { name, path, reactComponents } = identifyElementWithReact(
@@ -1378,9 +1398,9 @@ export function PageFeedbackToolbarCSS({
     const handleMouseDown = (e: MouseEvent) => {
       const target = e.target as HTMLElement;
 
-      if (target.closest("[data-feedback-toolbar]")) return;
-      if (target.closest("[data-annotation-marker]")) return;
-      if (target.closest("[data-annotation-popup]")) return;
+      if (closestCrossingShadow(target, "[data-feedback-toolbar]")) return;
+      if (closestCrossingShadow(target, "[data-annotation-marker]")) return;
+      if (closestCrossingShadow(target, "[data-annotation-popup]")) return;
 
       // Don't start drag on text elements - allow native text selection
       const textTags = new Set([
@@ -1557,8 +1577,8 @@ export function PageFeedbackToolbarCSS({
 
         for (const el of candidateElements) {
           if (
-            el.closest("[data-feedback-toolbar]") ||
-            el.closest("[data-annotation-marker]")
+            closestCrossingShadow(el, "[data-feedback-toolbar]") ||
+            closestCrossingShadow(el, "[data-annotation-marker]")
           )
             continue;
 
@@ -1669,8 +1689,8 @@ export function PageFeedbackToolbarCSS({
         document.querySelectorAll(selector).forEach((el) => {
           if (!(el instanceof HTMLElement)) return;
           if (
-            el.closest("[data-feedback-toolbar]") ||
-            el.closest("[data-annotation-marker]")
+            closestCrossingShadow(el, "[data-feedback-toolbar]") ||
+            closestCrossingShadow(el, "[data-annotation-marker]")
           )
             return;
 

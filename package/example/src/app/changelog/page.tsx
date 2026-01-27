@@ -38,6 +38,7 @@ const releases: Release[] = [
       { type: "added", text: "JSON Schema and TypeScript definitions for the annotation format" },
       { type: "added", text: <><a href="/webhooks" className="styled-link">Webhooks</a> to subscribe to annotation events with structured JSON payloads</> },
       { type: "added", text: <><a href="/features#react-detection" className="styled-link">React component detection</a> — shows full component hierarchy on hover, not just DOM elements</> },
+      { type: "added", text: <>Shadow DOM support — annotate elements inside modals, web components, and design systems that use shadow DOM</> },
       { type: "added", text: "Toolbar position persists in localStorage — drag it once, it stays where you put it" },
       { type: "improved", text: "Component detection adapts to output detail level (Compact, Standard, Detailed, Forensic)" },
       { type: "improved", text: "Cursor styles in settings panel — I-beam for text inputs, pointer for clickable items" },
