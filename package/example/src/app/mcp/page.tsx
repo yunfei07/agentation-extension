@@ -101,12 +101,6 @@ npx agentation-mcp help                    # Show help`}
             copyable
             code={`npx agentation-mcp server --mcp-only --http-url https://agentation-mcp-cloud.vercel.app --api-key ag_xxx`}
           />
-          <p style={{ marginTop: "0.75rem" }}>Or using an environment variable:</p>
-          <CodeBlock
-            language="bash"
-            copyable
-            code={`AGENTATION_API_KEY=ag_xxx npx agentation-mcp server --mcp-only --http-url https://agentation-mcp-cloud.vercel.app`}
-          />
         </section>
 
         <section>
