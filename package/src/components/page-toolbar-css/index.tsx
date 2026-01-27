@@ -746,6 +746,19 @@ export function PageFeedbackToolbarCSS({
     } catch (e) {
       // Ignore localStorage errors
     }
+
+    // Load saved toolbar position
+    try {
+      const savedPosition = localStorage.getItem("feedback-toolbar-position");
+      if (savedPosition) {
+        const pos = JSON.parse(savedPosition);
+        if (typeof pos.x === "number" && typeof pos.y === "number") {
+          setToolbarPosition(pos);
+        }
+      }
+    } catch (e) {
+      // Ignore localStorage errors
+    }
   }, [pathname]);
 
   // Save settings
@@ -767,6 +780,21 @@ export function PageFeedbackToolbarCSS({
       );
     }
   }, [isDarkMode, mounted]);
+
+  // Save toolbar position when drag ends
+  const prevDraggingRef = useRef(false);
+  useEffect(() => {
+    const wasDragging = prevDraggingRef.current;
+    prevDraggingRef.current = isDraggingToolbar;
+
+    // Save position when dragging ends (transition from true to false)
+    if (wasDragging && !isDraggingToolbar && toolbarPosition && mounted) {
+      localStorage.setItem(
+        "feedback-toolbar-position",
+        JSON.stringify(toolbarPosition),
+      );
+    }
+  }, [isDraggingToolbar, toolbarPosition, mounted]);
 
   // Initialize server session (when endpoint is provided)
   useEffect(() => {
