@@ -7,7 +7,7 @@
     "build": "pnpm --filter agentation build",
     "example": "pnpm --filter feedback-tool-example dev",
     "pack": "cd package && pnpm pack",
-    "mcp": "pnpm --filter @agentation/mcp start"
+    "mcp": "pnpm --filter agentation-mcp start"
   },
   "pnpm": {
     "onlyBuiltDependencies": [

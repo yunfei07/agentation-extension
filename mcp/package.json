@@ -1,5 +1,5 @@
 {
-  "name": "@agentation/mcp",
+  "name": "agentation-mcp",
   "version": "1.0.0",
   "description": "MCP server for Agentation - visual feedback for AI coding agents",
   "license": "MIT",
