@@ -160,4 +160,4 @@ AGENTATION_STORE=memory agentation-mcp server
 
 ## License
 
-MIT
+PolyForm Shield 1.0.0
