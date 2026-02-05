@@ -75,14 +75,3 @@ async function main(): Promise<void> {
   await startMcpServer(httpUrl);
 }
 
-// Only run if this is the main module (CLI entry point)
-// Check if we're being run directly vs imported
-const isMainModule = process.argv[1]?.includes("server") ||
-                     process.argv[1]?.endsWith("agentation-mcp");
-
-if (isMainModule) {
-  main().catch((err) => {
-    console.error("Fatal error:", err);
-    process.exit(1);
-  });
-}
