@@ -1067,6 +1067,45 @@ export function PageFeedbackToolbarCSS({
     return () => clearInterval(interval);
   }, [endpoint, mounted]);
 
+  // Listen for server-side annotation updates (e.g. resolved by agent)
+  useEffect(() => {
+    if (!endpoint || !mounted || !currentSessionId) return;
+
+    const eventSource = new EventSource(
+      `${endpoint}/sessions/${currentSessionId}/events`
+    );
+
+    const removedStatuses = ["resolved", "dismissed"];
+
+    const handler = (e: MessageEvent) => {
+      try {
+        const event = JSON.parse(e.data);
+        if (removedStatuses.includes(event.payload?.status)) {
+          const id = event.payload.id as string;
+          // Trigger exit animation then remove
+          setExitingMarkers((prev) => new Set(prev).add(id));
+          setTimeout(() => {
+            setAnnotations((prev) => prev.filter((a) => a.id !== id));
+            setExitingMarkers((prev) => {
+              const next = new Set(prev);
+              next.delete(id);
+              return next;
+            });
+          }, 150);
+        }
+      } catch {
+        // Ignore parse errors
+      }
+    };
+
+    eventSource.addEventListener("annotation.updated", handler);
+
+    return () => {
+      eventSource.removeEventListener("annotation.updated", handler);
+      eventSource.close();
+    };
+  }, [endpoint, mounted, currentSessionId]);
+
   // Sync local annotations when connection is restored
   useEffect(() => {
     if (!endpoint || !mounted) return;

@@ -276,10 +276,13 @@ export const TOOLS = [
   {
     name: "agentation_watch_annotations",
     description:
-      "Block until new annotations appear, then collect a batch and return all pending annotations. " +
+      "Block until new annotations appear, then collect a batch and return them. " +
       "Unlike wait_for_action (which requires the user to click 'Send to Agent'), this triggers " +
       "automatically when annotations are created. After detecting the first new annotation, waits " +
-      "for a batch window to collect more before returning. Use in a loop for hands-free processing.",
+      "for a batch window to collect more before returning. Use in a loop for hands-free processing. " +
+      "After addressing each annotation, call agentation_resolve with the annotation ID and a summary " +
+      "of what you did. Only resolve annotations the user accepted — if the user rejects your change, " +
+      "leave the annotation open.",
     inputSchema: {
       type: "object" as const,
       properties: {
@@ -482,7 +485,10 @@ type WatchAnnotationsResult =
 /**
  * Watch for new annotation.created events via SSE from the HTTP server.
  * When the first annotation is detected, waits for a batch window to collect
- * additional annotations, then fetches all pending annotations via HTTP.
+ * additional annotations directly from SSE event payloads.
+ *
+ * Initial sync events (sequence 0) are ignored to prevent false triggers
+ * from pre-existing pending annotations when the SSE connection opens.
  *
  * This is the "automatic" counterpart to waitForActionEvent -- instead of
  * waiting for an explicit user action, it triggers on any new annotation.
@@ -497,6 +503,7 @@ function watchForAnnotations(
     const controller = new AbortController();
     let batchTimeout: ReturnType<typeof setTimeout> | null = null;
     const detectedSessions = new Set<string>();
+    const collectedAnnotations: Annotation[] = [];
 
     const cleanup = () => {
       aborted = true;
@@ -555,33 +562,25 @@ function watchForAnnotations(
               try {
                 const event = JSON.parse(line.slice(6));
                 if (event.type === "annotation.created") {
+                  // Skip initial sync events (sequence 0) — historical replay, not new
+                  if (event.sequence === 0) continue;
+
                   // If filtering by session, check it matches
-                  if (sessionId && event.sessionId !== sessionId) {
-                    continue;
-                  }
+                  if (sessionId && event.sessionId !== sessionId) continue;
 
                   detectedSessions.add(event.sessionId);
+                  collectedAnnotations.push(event.payload as Annotation);
 
-                  // First annotation detected - start batch window
+                  // First annotation detected — start batch window
                   if (!batchTimeout) {
-                    batchTimeout = setTimeout(async () => {
+                    batchTimeout = setTimeout(() => {
                       clearTimeout(timeoutId);
                       cleanup();
-
-                      // Fetch all pending annotations via HTTP
-                      try {
-                        const pending = await httpGet<PendingResponse>("/pending");
-                        resolve({
-                          type: "annotations",
-                          annotations: pending.annotations,
-                          sessions: Array.from(detectedSessions),
-                        });
-                      } catch (err) {
-                        resolve({
-                          type: "error",
-                          message: `Failed to fetch pending annotations: ${(err as Error).message}`,
-                        });
-                      }
+                      resolve({
+                        type: "annotations",
+                        annotations: collectedAnnotations,
+                        sessions: Array.from(detectedSessions),
+                      });
                     }, batchWindowMs);
                   }
                 }
@@ -597,9 +596,11 @@ function watchForAnnotations(
         if (!aborted) {
           clearTimeout(timeoutId);
           const message = err instanceof Error ? err.message : "Unknown connection error";
+          // Check for common connection errors
           if (message.includes("ECONNREFUSED") || message.includes("fetch failed")) {
             resolve({ type: "error", message: `Cannot connect to HTTP server at ${httpBaseUrl}. Is the agentation server running?` });
           } else if (message.includes("abort")) {
+            // Aborted by timeout - already handled
             resolve({ type: "timeout" });
           } else {
             resolve({ type: "error", message: `Connection error: ${message}` });
