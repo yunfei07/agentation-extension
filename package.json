@@ -8,6 +8,11 @@
     "example": "pnpm --filter feedback-tool-example dev",
     "pack": "cd package && pnpm pack",
     "mcp": "pnpm --filter agentation-mcp start",
+    "backend:setup": "make backend-setup",
+    "backend:dev": "make backend-run",
+    "extension:build": "pnpm --filter agentation-extension build",
+    "extension:test": "pnpm --filter agentation-extension test",
+    "stack:up": "make stack-up",
     "publish:agentation": "pnpm --filter agentation publish --access public",
     "publish:mcp": "pnpm --filter agentation-mcp publish --access public",
     "publish:all": "pnpm publish:agentation && pnpm publish:mcp"

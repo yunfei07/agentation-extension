@@ -2,3 +2,16 @@ node_modules/.claude/settings.local.json
 node_modules
 mcp/dist
 .DS_Store
+.vscode
+.claude
+extension/dist
+backend/.venv
+backend/.pytest_cache
+backend/**/__pycache__
+backend/.env
+
+extension/node_modules
+extension/dist
+
+package/node_modules
+package/dist

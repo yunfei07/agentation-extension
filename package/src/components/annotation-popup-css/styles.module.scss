@@ -63,6 +63,7 @@ $green: #34c759;
     position: fixed;
     transform: translateX(-50%);
     width: 280px;
+    max-width: calc(100vw - 40px);
     padding: 0.75rem 1rem 14px;
     background: #1a1a1a;
     border-radius: 16px;
@@ -71,6 +72,7 @@ $green: #34c759;
         0 0 0 1px rgba(255, 255, 255, 0.08);
     cursor: default;
     z-index: 100001;
+    overflow: hidden;
     font-family:
         system-ui,
         -apple-system,
@@ -229,7 +231,12 @@ $green: #34c759;
 // =============================================================================
 
 .textarea {
-    width: 100%;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    box-sizing: border-box !important;
+    display: block !important;
+    overflow-x: hidden !important;
     padding: 0.5rem 0.625rem;
     font-size: 0.8125rem;
     font-family: inherit;
@@ -238,11 +245,22 @@ $green: #34c759;
     border: 1px solid rgba(255, 255, 255, 0.15);
     border-radius: 8px;
     resize: none;
-    outline: none;
+    outline: none !important;
+    box-shadow: none !important;
+    transform: none !important;
     transition: border-color 0.15s ease;
 
     &:focus {
         border-color: $blue;
+        outline: none !important;
+        box-shadow: none !important;
+        transform: none !important;
+    }
+
+    &:focus-visible {
+        outline: none !important;
+        box-shadow: none !important;
+        transform: none !important;
     }
 
     &.green:focus {

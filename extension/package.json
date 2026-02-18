@@ -1,0 +1,29 @@
+{
+  "name": "agentation-extension",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "clean": "rm -rf dist",
+    "prepare:agentation": "pnpm --filter agentation build",
+    "build:bundle": "node ./scripts/build.mjs",
+    "copy:assets": "cp manifest.json dist/manifest.json && cp popup.html dist/popup.html",
+    "build": "pnpm run prepare:agentation && pnpm run clean && pnpm run build:bundle && pnpm run copy:assets",
+    "typecheck": "pnpm run prepare:agentation && tsc --noEmit",
+    "test": "pnpm run prepare:agentation && vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "agentation": "workspace:*",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  },
+  "devDependencies": {
+    "@types/chrome": "^0.0.321",
+    "@types/react": "^18.2.0",
+    "@types/react-dom": "^18.2.0",
+    "esbuild": "^0.25.9",
+    "typescript": "^5.0.0",
+    "vitest": "^2.0.0"
+  }
+}

@@ -23,6 +23,7 @@ import {
   IconEyeMinus,
   IconCopyAlt,
   IconCopyAnimated,
+  IconRobotStatus,
   IconSendArrow,
   IconTrashAlt,
   IconXmark,
@@ -51,6 +52,7 @@ import {
   getNearbyElements,
   closestCrossingShadow,
 } from "../../utils/element-identification";
+import { buildPlaywrightMetadata } from "../../utils/playwright-selectors";
 import {
   loadAnnotations,
   loadAllAnnotations,
@@ -77,7 +79,11 @@ import {
   originalSetInterval,
 } from "../../utils/freeze-animations";
 
-import type { Annotation } from "../../types";
+import type {
+  Annotation,
+  PlaywrightElementInfo,
+  PlaywrightSelectorCandidate,
+} from "../../types";
 import styles from "./styles.module.scss";
 
 /**
@@ -130,7 +136,12 @@ type HoverInfo = {
   reactComponents?: string | null;
 };
 
-type OutputDetailLevel = "compact" | "standard" | "detailed" | "forensic";
+type OutputDetailLevel =
+  | "compact"
+  | "standard"
+  | "detailed"
+  | "playwright"
+  | "forensic";
 // ReactComponentMode is now derived from outputDetail when reactEnabled is true
 type ReactComponentMode = "smart" | "filtered" | "all" | "off";
 type MarkerClickBehavior = "edit" | "delete";
@@ -173,6 +184,7 @@ const OUTPUT_TO_REACT_MODE: Record<OutputDetailLevel, ReactComponentMode> = {
   compact: "off",
   standard: "filtered",
   detailed: "smart",
+  playwright: "off",
   forensic: "all",
 };
 
@@ -188,6 +200,7 @@ const OUTPUT_DETAIL_OPTIONS: { value: OutputDetailLevel; label: string }[] = [
   { value: "compact", label: "Compact" },
   { value: "standard", label: "Standard" },
   { value: "detailed", label: "Detailed" },
+  { value: "playwright", label: "Playwright" },
   { value: "forensic", label: "Forensic" },
 ];
 
@@ -200,6 +213,13 @@ const COLOR_OPTIONS = [
   { value: "#FF9500", label: "Orange" },
   { value: "#FF3B30", label: "Red" },
 ];
+
+const TOOLBAR_COLLAPSED_WIDTH = 44;
+const TOOLBAR_EXPANDED_WIDTH = 297;
+const TOOLBAR_EXPANDED_WITH_SEND_WIDTH = 337;
+const TOOLBAR_WRAPPER_WIDTH = TOOLBAR_EXPANDED_WITH_SEND_WIDTH;
+const TOOLBAR_HEIGHT = 44;
+const DOMAIN_STORAGE_PATH_PREFIX = "/__agentation_domain__/";
 
 // =============================================================================
 // Utils
@@ -278,6 +298,25 @@ function truncateUrl(url: string): string {
   }
 }
 
+function getDomainStoragePath(pathname: string): string {
+  if (typeof window === "undefined") return pathname;
+  return `${DOMAIN_STORAGE_PATH_PREFIX}${window.location.hostname}`;
+}
+
+function mergeAnnotationsById(annotationGroups: Annotation[][]): Annotation[] {
+  const merged = new Map<string, Annotation>();
+
+  annotationGroups.flat().forEach((annotation) => {
+    if (!annotation?.id) return;
+    const existing = merged.get(annotation.id);
+    if (!existing || annotation.timestamp >= existing.timestamp) {
+      merged.set(annotation.id, annotation);
+    }
+  });
+
+  return Array.from(merged.values()).sort((a, b) => a.timestamp - b.timestamp);
+}
+
 function getActiveButtonStyle(
   isActive: boolean,
   color: string,
@@ -287,6 +326,169 @@ function getActiveButtonStyle(
     color: color,
     backgroundColor: hexToRgba(color, 0.25),
   };
+}
+
+function escapeDoubleQuoted(value: string): string {
+  return value.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+}
+
+function getFallbackTagFromPath(path?: string): string | undefined {
+  if (!path) return undefined;
+  const parts = path.split(">").map((item) => item.trim()).filter(Boolean);
+  const last = parts[parts.length - 1];
+  if (!last) return undefined;
+  const matched = last.match(/^[a-zA-Z][a-zA-Z0-9-]*/);
+  return matched ? matched[0].toLowerCase() : undefined;
+}
+
+function extractAccessibilityField(
+  accessibility: string | undefined,
+  field: string,
+): string | undefined {
+  if (!accessibility) return undefined;
+  const pattern = new RegExp(`${field}="([^"]+)"`);
+  const match = accessibility.match(pattern);
+  return match?.[1];
+}
+
+function getPlaywrightElementInfo(annotation: Annotation): PlaywrightElementInfo {
+  if (annotation.playwrightElementInfo) {
+    return annotation.playwrightElementInfo;
+  }
+
+  const tag = getFallbackTagFromPath(annotation.elementPath) ||
+    getFallbackTagFromPath(annotation.fullPath);
+
+  return {
+    tag,
+    text: annotation.selectedText || annotation.nearbyText,
+    role: extractAccessibilityField(annotation.accessibility, "role"),
+    label: extractAccessibilityField(annotation.accessibility, "aria-label"),
+    css: annotation.fullPath || annotation.elementPath,
+  };
+}
+
+function buildPlaywrightSelectorsFromInfo(
+  info: PlaywrightElementInfo,
+): PlaywrightSelectorCandidate[] {
+  const candidates: PlaywrightSelectorCandidate[] = [];
+  if (info.dataTestId) {
+    candidates.push({
+      strategy: "data-testid",
+      selector: `page.getByTestId("${escapeDoubleQuoted(info.dataTestId)}")`,
+      score: 100,
+    });
+  }
+  if (info.role) {
+    const roleName = info.label || info.text;
+    candidates.push({
+      strategy: "role",
+      selector: roleName
+        ? `page.getByRole("${escapeDoubleQuoted(info.role)}", { name: "${escapeDoubleQuoted(roleName)}" })`
+        : `page.getByRole("${escapeDoubleQuoted(info.role)}")`,
+      score: roleName ? 94 : 86,
+    });
+  }
+  if (info.label) {
+    candidates.push({
+      strategy: "label",
+      selector: `page.getByLabel("${escapeDoubleQuoted(info.label)}")`,
+      score: 92,
+    });
+  }
+  if (info.id) {
+    candidates.push({
+      strategy: "id",
+      selector: `page.locator("#${escapeDoubleQuoted(info.id)}")`,
+      score: 90,
+    });
+  }
+  if (info.name) {
+    candidates.push({
+      strategy: "name",
+      selector: `page.locator("[name=\\"${escapeDoubleQuoted(info.name)}\\"]")`,
+      score: 80,
+    });
+  }
+  if (info.text) {
+    candidates.push({
+      strategy: "text",
+      selector: `page.getByText("${escapeDoubleQuoted(info.text)}")`,
+      score: 72,
+    });
+  }
+  if (info.css) {
+    candidates.push({
+      strategy: "css",
+      selector: `page.locator("${escapeDoubleQuoted(info.css)}")`,
+      score: 65,
+    });
+  }
+  if (info.xpath) {
+    candidates.push({
+      strategy: "xpath",
+      selector: `page.locator("xpath=${escapeDoubleQuoted(info.xpath)}")`,
+      score: 56,
+    });
+  }
+  if (info.tag) {
+    candidates.push({
+      strategy: "css",
+      selector: `page.locator("${escapeDoubleQuoted(info.tag)}")`,
+      score: 10,
+    });
+  }
+
+  const deduped = new Map<string, PlaywrightSelectorCandidate>();
+  for (const candidate of candidates) {
+    const existing = deduped.get(candidate.selector);
+    if (!existing || existing.score < candidate.score) {
+      deduped.set(candidate.selector, candidate);
+    }
+  }
+
+  return Array.from(deduped.values())
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 3);
+}
+
+function getTopPlaywrightSelectors(
+  annotation: Annotation,
+  info: PlaywrightElementInfo,
+): PlaywrightSelectorCandidate[] {
+  if (annotation.playwrightTopSelectors?.length) {
+    return [...annotation.playwrightTopSelectors]
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 3);
+  }
+  return buildPlaywrightSelectorsFromInfo(info);
+}
+
+function hasPlaywrightFieldValue(value: string | undefined): value is string {
+  if (typeof value !== "string") return false;
+  const normalized = value.trim();
+  if (!normalized) return false;
+  if (normalized === "-") return false;
+  return true;
+}
+
+function buildPlaywrightProfileLines(info: PlaywrightElementInfo): string[] {
+  const orderedFields: Array<{ label: string; value?: string }> = [
+    { label: "id", value: info.id },
+    { label: "name", value: info.name },
+    { label: "tag", value: info.tag },
+    { label: "type", value: info.type },
+    { label: "text", value: info.text },
+    { label: "role", value: info.role },
+    { label: "label", value: info.label },
+    { label: "data-testid", value: info.dataTestId },
+    { label: "css", value: info.css },
+    { label: "xpath", value: info.xpath },
+  ];
+
+  return orderedFields
+    .filter((field) => hasPlaywrightFieldValue(field.value))
+    .map((field) => `- ${field.label}: \`${field.value}\``);
 }
 
 function generateOutput(
@@ -304,7 +506,11 @@ function generateOutput(
 
   let output = `## Page Feedback: ${pathname}\n`;
 
-  if (detailLevel === "forensic") {
+  if (detailLevel === "playwright") {
+    output += `**Playwright Annotation Context**\n`;
+    output += `**Viewport:** ${viewport}\n`;
+    output += "\n";
+  } else if (detailLevel === "forensic") {
     // Full environment info for forensic mode
     output += `\n**Environment:**\n`;
     output += `- Viewport: ${viewport}\n`;
@@ -327,6 +533,30 @@ function generateOutput(
         output += ` (re: "${a.selectedText.slice(0, 30)}${a.selectedText.length > 30 ? "..." : ""}")`;
       }
       output += "\n";
+    } else if (detailLevel === "playwright") {
+      const elementInfo = getPlaywrightElementInfo(a);
+      const topSelectors = getTopPlaywrightSelectors(a, elementInfo);
+      const profileLines = buildPlaywrightProfileLines(elementInfo);
+
+      output += `### ${i + 1}. ${a.element}\n`;
+      output += `**Location:** ${a.elementPath}\n`;
+      output += `**Playwright Element Profile:**\n`;
+      if (profileLines.length === 0) {
+        output += `- no profile fields captured\n`;
+      } else {
+        profileLines.forEach((line) => {
+          output += `${line}\n`;
+        });
+      }
+      output += `**Top 3 Stable Selectors:**\n`;
+      if (topSelectors.length === 0) {
+        output += `1. [css] \`page.locator("${escapeDoubleQuoted(a.elementPath)}")\`\n`;
+      } else {
+        topSelectors.forEach((selector, index) => {
+          output += `${index + 1}. [${selector.strategy}] \`${selector.selector}\`\n`;
+        });
+      }
+      output += `**Feedback:** ${a.comment}\n\n`;
     } else if (detailLevel === "forensic") {
       // Forensic mode - order matches output page example
       output += `### ${i + 1}. ${a.element}\n`;
@@ -423,6 +653,11 @@ export type PageFeedbackToolbarCSSProps = {
   onCopy?: (markdown: string) => void;
   /** Callback fired when "Send to Agent" is clicked. Receives the markdown output and annotations. */
   onSubmit?: (output: string, annotations: Annotation[]) => void;
+  /** Callback fired when the robot button is clicked. Receives generated markdown output and annotations. */
+  onGenerateScript?: (
+    output: string,
+    annotations: Annotation[],
+  ) => void | Promise<void>;
   /** Whether to copy to clipboard when the copy button is clicked. Defaults to true. */
   copyToClipboard?: boolean;
   /** Server URL for sync (e.g., "http://localhost:4747"). If not provided, uses localStorage only. */
@@ -452,6 +687,7 @@ export function PageFeedbackToolbarCSS({
   onAnnotationsClear,
   onCopy,
   onSubmit,
+  onGenerateScript,
   copyToClipboard = true,
   endpoint,
   sessionId: initialSessionId,
@@ -485,6 +721,8 @@ export function PageFeedbackToolbarCSS({
     computedStylesObj?: Record<string, string>;
     nearbyElements?: string;
     reactComponents?: string;
+    playwrightElementInfo?: PlaywrightElementInfo;
+    playwrightTopSelectors?: PlaywrightSelectorCandidate[];
     elementBoundingBoxes?: Array<{
       x: number;
       y: number;
@@ -497,6 +735,9 @@ export function PageFeedbackToolbarCSS({
     targetElement?: HTMLElement;
   } | null>(null);
   const [copied, setCopied] = useState(false);
+  const [generateState, setGenerateState] = useState<
+    "idle" | "generating" | "sent" | "failed"
+  >("idle");
   const [sendState, setSendState] = useState<
     "idle" | "sending" | "sent" | "failed"
   >("idle");
@@ -721,6 +962,10 @@ export function PageFeedbackToolbarCSS({
 
   const pathname =
     typeof window !== "undefined" ? window.location.pathname : "/";
+  const annotationStoragePath = getDomainStoragePath(pathname);
+  const hasManualSendButton =
+    !settings.webhooksEnabled &&
+    (isValidUrl(settings.webhookUrl) || isValidUrl(webhookUrl || ""));
 
   // Handle showSettings changes with exit animation
   useEffect(() => {
@@ -776,8 +1021,19 @@ export function PageFeedbackToolbarCSS({
   useEffect(() => {
     setMounted(true);
     setScrollY(window.scrollY);
-    const stored = loadAnnotations<Annotation>(pathname);
-    setAnnotations(stored);
+    const allStored = loadAllAnnotations<Annotation>();
+    const merged = mergeAnnotationsById(Array.from(allStored.values()));
+    setAnnotations(merged);
+
+    if (merged.length > 0) {
+      saveAnnotations(annotationStoragePath, merged);
+    }
+
+    for (const storagePath of allStored.keys()) {
+      if (storagePath !== annotationStoragePath) {
+        localStorage.removeItem(getStorageKey(storagePath));
+      }
+    }
 
     // Trigger entrance animation only on first load (not on SPA navigation)
     if (!hasPlayedEntranceAnimation) {
@@ -819,7 +1075,7 @@ export function PageFeedbackToolbarCSS({
     } catch (e) {
       // Ignore localStorage errors
     }
-  }, [pathname]);
+  }, [annotationStoragePath]);
 
   // Save settings
   useEffect(() => {
@@ -865,7 +1121,7 @@ export function PageFeedbackToolbarCSS({
     const initSession = async () => {
       try {
         // Check for stored session ID to rejoin on refresh
-        const storedSessionId = loadSessionId(pathname);
+        const storedSessionId = loadSessionId(annotationStoragePath);
         const sessionIdToJoin = initialSessionId || storedSessionId;
         let sessionEstablished = false;
 
@@ -875,7 +1131,7 @@ export function PageFeedbackToolbarCSS({
             const session = await getSession(endpoint, sessionIdToJoin);
             setCurrentSessionId(session.id);
             setConnectionStatus("connected");
-            saveSessionId(pathname, session.id);
+            saveSessionId(annotationStoragePath, session.id);
             sessionEstablished = true;
 
             // Find local annotations that need to be synced:
@@ -883,7 +1139,8 @@ export function PageFeedbackToolbarCSS({
             // 2. Annotations synced to a different session
             // 3. Annotations marked as synced to THIS session but missing from server
             //    (handles server-side deletion)
-            const allLocalAnnotations = loadAnnotations<Annotation>(pathname);
+            const allLocalAnnotations =
+              loadAnnotations<Annotation>(annotationStoragePath);
             const serverIds = new Set(session.annotations.map((a) => a.id));
             const localToMerge = allLocalAnnotations.filter((a) => {
               // If it exists on server, don't re-upload
@@ -926,14 +1183,14 @@ export function PageFeedbackToolbarCSS({
               ];
               setAnnotations(allAnnotations);
               saveAnnotationsWithSyncMarker(
-                pathname,
+                annotationStoragePath,
                 allAnnotations,
                 session.id,
               );
             } else {
               setAnnotations(session.annotations);
               saveAnnotationsWithSyncMarker(
-                pathname,
+                annotationStoragePath,
                 session.annotations,
                 session.id,
               );
@@ -945,7 +1202,7 @@ export function PageFeedbackToolbarCSS({
               joinError,
             );
             // Clear the stored session ID since it's invalid
-            clearSessionId(pathname);
+            clearSessionId(annotationStoragePath);
             // sessionEstablished remains false, will create new session
           }
         }
@@ -958,7 +1215,7 @@ export function PageFeedbackToolbarCSS({
           const session = await createSession(endpoint, currentUrl);
           setCurrentSessionId(session.id);
           setConnectionStatus("connected");
-          saveSessionId(pathname, session.id);
+          saveSessionId(annotationStoragePath, session.id);
           onSessionCreated?.(session.id);
 
           // Only sync annotations that have never been synced (no _syncedTo marker)
@@ -976,7 +1233,7 @@ export function PageFeedbackToolbarCSS({
             if (unsyncedAnnotations.length === 0) continue;
 
             const pageUrl = `${baseUrl}${pagePath}`;
-            const isCurrentPage = pagePath === pathname;
+            const isCurrentPage = pagePath === annotationStoragePath;
 
             syncPromises.push(
               (async () => {
@@ -1049,7 +1306,14 @@ export function PageFeedbackToolbarCSS({
     };
 
     initSession();
-  }, [endpoint, initialSessionId, mounted, onSessionCreated, pathname]);
+  }, [
+    endpoint,
+    initialSessionId,
+    mounted,
+    onSessionCreated,
+    pathname,
+    annotationStoragePath,
+  ]);
 
   // Periodic health check for server connection
   useEffect(() => {
@@ -1126,7 +1390,8 @@ export function PageFeedbackToolbarCSS({
       // Sync any local annotations that aren't on the server
       const syncLocalAnnotations = async () => {
         try {
-          const localAnnotations = loadAnnotations<Annotation>(pathname);
+          const localAnnotations =
+            loadAnnotations<Annotation>(annotationStoragePath);
           if (localAnnotations.length === 0) return;
 
           const baseUrl = typeof window !== "undefined" ? window.location.origin : "";
@@ -1152,7 +1417,7 @@ export function PageFeedbackToolbarCSS({
             const newSession = await createSession(endpoint, pageUrl);
             sessionId = newSession.id;
             setCurrentSessionId(sessionId);
-            saveSessionId(pathname, sessionId);
+            saveSessionId(annotationStoragePath, sessionId);
           }
 
           // Find annotations that need syncing
@@ -1181,7 +1446,11 @@ export function PageFeedbackToolbarCSS({
             // Update local state with server + synced annotations
             const allAnnotations = [...serverAnnotations, ...syncedAnnotations];
             setAnnotations(allAnnotations);
-            saveAnnotationsWithSyncMarker(pathname, allAnnotations, sessionId!);
+            saveAnnotationsWithSyncMarker(
+              annotationStoragePath,
+              allAnnotations,
+              sessionId!,
+            );
           }
         } catch (err) {
           console.warn("[Agentation] Failed to sync on reconnect:", err);
@@ -1190,7 +1459,14 @@ export function PageFeedbackToolbarCSS({
 
       syncLocalAnnotations();
     }
-  }, [connectionStatus, endpoint, mounted, currentSessionId, pathname]);
+  }, [
+    connectionStatus,
+    endpoint,
+    mounted,
+    currentSessionId,
+    pathname,
+    annotationStoragePath,
+  ]);
 
   // Demo annotations
   useEffect(() => {
@@ -1216,6 +1492,7 @@ export function PageFeedbackToolbarCSS({
 
           const rect = element.getBoundingClientRect();
           const { name, path } = identifyElement(element);
+          const playwrightMetadata = buildPlaywrightMetadata(element);
 
           const newAnnotation: Annotation = {
             id: `demo-${Date.now()}-${index}`,
@@ -1234,6 +1511,8 @@ export function PageFeedbackToolbarCSS({
             },
             nearbyText: getNearbyText(element),
             cssClasses: getElementClasses(element),
+            playwrightElementInfo: playwrightMetadata.elementInfo,
+            playwrightTopSelectors: playwrightMetadata.topSelectors,
           };
 
           setAnnotations((prev) => [...prev, newAnnotation]);
@@ -1275,15 +1554,19 @@ export function PageFeedbackToolbarCSS({
     if (mounted && annotations.length > 0) {
       if (currentSessionId) {
         // Connected to session - save with sync marker to prevent re-upload on refresh
-        saveAnnotationsWithSyncMarker(pathname, annotations, currentSessionId);
+        saveAnnotationsWithSyncMarker(
+          annotationStoragePath,
+          annotations,
+          currentSessionId,
+        );
       } else {
         // Not connected - save without markers (will sync when connected)
-        saveAnnotations(pathname, annotations);
+        saveAnnotations(annotationStoragePath, annotations);
       }
     } else if (mounted && annotations.length === 0) {
-      localStorage.removeItem(getStorageKey(pathname));
+      localStorage.removeItem(getStorageKey(annotationStoragePath));
     }
-  }, [annotations, pathname, mounted, currentSessionId]);
+  }, [annotations, annotationStoragePath, mounted, currentSessionId]);
 
   // Freeze animations (delegates to freeze-animations utility)
   const freezeAnimations = useCallback(() => {
@@ -1323,6 +1606,7 @@ export function PageFeedbackToolbarCSS({
       // Single element - treat as regular annotation (not multi-select)
       const rect = freshRects[0];
       const isFixed = isElementFixed(firstEl);
+      const playwrightMetadata = buildPlaywrightMetadata(firstEl);
 
       setPendingAnnotation({
         x: (rect.left / window.innerWidth) * 100,
@@ -1345,6 +1629,8 @@ export function PageFeedbackToolbarCSS({
         cssClasses: getElementClasses(firstEl),
         nearbyText: getNearbyText(firstEl),
         reactComponents: firstItem.reactComponents,
+        playwrightElementInfo: playwrightMetadata.elementInfo,
+        playwrightTopSelectors: playwrightMetadata.topSelectors,
       });
     } else {
       // Multiple elements - multi-select annotation
@@ -1378,6 +1664,7 @@ export function PageFeedbackToolbarCSS({
       const lastCenterX = lastRect.left + lastRect.width / 2;
       const lastCenterY = lastRect.top + lastRect.height / 2;
       const lastIsFixed = isElementFixed(lastEl);
+      const playwrightMetadata = buildPlaywrightMetadata(firstEl);
 
       setPendingAnnotation({
         x: (lastCenterX / window.innerWidth) * 100,
@@ -1403,6 +1690,8 @@ export function PageFeedbackToolbarCSS({
         nearbyElements: getNearbyElements(firstEl),
         cssClasses: getElementClasses(firstEl),
         nearbyText: getNearbyText(firstEl),
+        playwrightElementInfo: playwrightMetadata.elementInfo,
+        playwrightTopSelectors: playwrightMetadata.topSelectors,
       });
     }
 
@@ -1637,6 +1926,7 @@ export function PageFeedbackToolbarCSS({
       // Capture computed styles - filtered for popup, full for forensic output
       const computedStylesObj = getDetailedComputedStyles(elementUnder);
       const computedStylesStr = getForensicComputedStyles(elementUnder);
+      const playwrightMetadata = buildPlaywrightMetadata(elementUnder);
 
       setPendingAnnotation({
         x,
@@ -1660,6 +1950,8 @@ export function PageFeedbackToolbarCSS({
         computedStylesObj,
         nearbyElements: getNearbyElements(elementUnder),
         reactComponents: reactComponents ?? undefined,
+        playwrightElementInfo: playwrightMetadata.elementInfo,
+        playwrightTopSelectors: playwrightMetadata.topSelectors,
         targetElement: elementUnder, // Store for live position queries
       });
       setHoverInfo(null);
@@ -2087,6 +2379,7 @@ export function PageFeedbackToolbarCSS({
             getDetailedComputedStyles(firstElement);
           const firstElementComputedStylesStr =
             getForensicComputedStyles(firstElement);
+          const playwrightMetadata = buildPlaywrightMetadata(firstElement);
 
           setPendingAnnotation({
             x,
@@ -2109,6 +2402,8 @@ export function PageFeedbackToolbarCSS({
             nearbyElements: getNearbyElements(firstElement),
             cssClasses: getElementClasses(firstElement),
             nearbyText: getNearbyText(firstElement),
+            playwrightElementInfo: playwrightMetadata.elementInfo,
+            playwrightTopSelectors: playwrightMetadata.topSelectors,
           });
         } else {
           // No elements selected, but allow annotation on empty area
@@ -2208,6 +2503,8 @@ export function PageFeedbackToolbarCSS({
         computedStyles: pendingAnnotation.computedStyles,
         nearbyElements: pendingAnnotation.nearbyElements,
         reactComponents: pendingAnnotation.reactComponents,
+        playwrightElementInfo: pendingAnnotation.playwrightElementInfo,
+        playwrightTopSelectors: pendingAnnotation.playwrightTopSelectors,
         elementBoundingBoxes: pendingAnnotation.elementBoundingBoxes,
         // Protocol fields for server sync
         ...(endpoint && currentSessionId
@@ -2539,12 +2836,18 @@ export function PageFeedbackToolbarCSS({
     originalSetTimeout(() => {
       setAnnotations([]);
       setAnimatedMarkers(new Set()); // Reset animated markers
-      localStorage.removeItem(getStorageKey(pathname));
+      localStorage.removeItem(getStorageKey(annotationStoragePath));
       setIsClearing(false);
     }, totalAnimationTime);
 
     originalSetTimeout(() => setCleared(false), 1500);
-  }, [pathname, annotations, onAnnotationsClear, fireWebhook, endpoint]);
+  }, [
+    annotationStoragePath,
+    annotations,
+    onAnnotationsClear,
+    fireWebhook,
+    endpoint,
+  ]);
 
   // Copy output
   const copyOutput = useCallback(async () => {
@@ -2588,6 +2891,44 @@ export function PageFeedbackToolbarCSS({
     clearAll,
     copyToClipboard,
     onCopy,
+  ]);
+
+  // Generate script output via callback
+  const generateScript = useCallback(async () => {
+    const displayUrl =
+      typeof window !== "undefined"
+        ? window.location.pathname +
+          window.location.search +
+          window.location.hash
+        : pathname;
+    const output = generateOutput(
+      annotations,
+      displayUrl,
+      settings.outputDetail,
+      effectiveReactMode,
+    );
+    if (!output) return;
+
+    const generationHandler = onGenerateScript ?? onSubmit;
+    if (!generationHandler) return;
+
+    setGenerateState("generating");
+    try {
+      await Promise.resolve(generationHandler(output, annotations));
+      setGenerateState("sent");
+    } catch (error) {
+      setGenerateState("failed");
+      console.warn("[Agentation] Script generation callback failed:", error);
+    } finally {
+      originalSetTimeout(() => setGenerateState("idle"), 2500);
+    }
+  }, [
+    annotations,
+    pathname,
+    settings.outputDetail,
+    effectiveReactMode,
+    onGenerateScript,
+    onSubmit,
   ]);
 
   // Send to webhook
@@ -2662,16 +3003,16 @@ export function PageFeedbackToolbarCSS({
 
         // Constrain to viewport
         const padding = 20;
-        const wrapperWidth = 297; // .toolbar wrapper width
-        const toolbarHeight = 44;
+        const wrapperWidth = TOOLBAR_WRAPPER_WIDTH;
+        const toolbarHeight = TOOLBAR_HEIGHT;
 
         // Content is right-aligned within wrapper via margin-left: auto
         // Calculate content width based on state
         const contentWidth = isActive
-          ? connectionStatus === "connected"
-            ? 297
-            : 257
-          : 44; // collapsed circle
+          ? hasManualSendButton
+            ? TOOLBAR_EXPANDED_WITH_SEND_WIDTH
+            : TOOLBAR_EXPANDED_WIDTH
+          : TOOLBAR_COLLAPSED_WIDTH;
 
         // Content offset from wrapper left edge
         const contentOffset = wrapperWidth - contentWidth;
@@ -2707,7 +3048,7 @@ export function PageFeedbackToolbarCSS({
       document.removeEventListener("mousemove", handleMouseMove);
       document.removeEventListener("mouseup", handleMouseUp);
     };
-  }, [dragStartPos, isDraggingToolbar, isActive, connectionStatus]);
+  }, [dragStartPos, isDraggingToolbar, isActive, hasManualSendButton]);
 
   // Handle toolbar drag start
   const handleToolbarMouseDown = useCallback(
@@ -2751,8 +3092,8 @@ export function PageFeedbackToolbarCSS({
 
     const constrainPosition = () => {
       const padding = 20;
-      const wrapperWidth = 297; // .toolbar wrapper width
-      const toolbarHeight = 44;
+      const wrapperWidth = TOOLBAR_WRAPPER_WIDTH;
+      const toolbarHeight = TOOLBAR_HEIGHT;
 
       let newX = toolbarPosition.x;
       let newY = toolbarPosition.y;
@@ -2760,10 +3101,10 @@ export function PageFeedbackToolbarCSS({
       // Content is right-aligned within wrapper via margin-left: auto
       // Calculate content width based on state
       const contentWidth = isActive
-        ? connectionStatus === "connected"
-          ? 297
-          : 257
-        : 44; // collapsed circle
+        ? hasManualSendButton
+          ? TOOLBAR_EXPANDED_WITH_SEND_WIDTH
+          : TOOLBAR_EXPANDED_WIDTH
+        : TOOLBAR_COLLAPSED_WIDTH;
 
       // Content offset from wrapper left edge
       const contentOffset = wrapperWidth - contentWidth;
@@ -2790,7 +3131,7 @@ export function PageFeedbackToolbarCSS({
 
     window.addEventListener("resize", constrainPosition);
     return () => window.removeEventListener("resize", constrainPosition);
-  }, [toolbarPosition, isActive, connectionStatus]);
+  }, [toolbarPosition, isActive, hasManualSendButton]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -2852,6 +3193,19 @@ export function PageFeedbackToolbarCSS({
         }
       }
 
+      // "G" to generate script
+      if (e.key === "g" || e.key === "G") {
+        if (
+          annotations.length > 0 &&
+          (onGenerateScript || onSubmit) &&
+          generateState === "idle"
+        ) {
+          e.preventDefault();
+          hideTooltipsUntilMouseLeave();
+          generateScript();
+        }
+      }
+
       // "X" to clear all
       if (e.key === "x" || e.key === "X") {
         if (annotations.length > 0) {
@@ -2885,17 +3239,29 @@ export function PageFeedbackToolbarCSS({
     annotations.length,
     settings.webhookUrl,
     webhookUrl,
+    generateState,
     sendState,
     sendToWebhook,
     toggleFreeze,
     copyOutput,
+    generateScript,
     clearAll,
     pendingMultiSelectElements,
+    onGenerateScript,
+    onSubmit,
   ]);
 
   if (!mounted) return null;
 
   const hasAnnotations = annotations.length > 0;
+  const generateTooltipLabel =
+    generateState === "generating"
+      ? "Generating script..."
+      : generateState === "sent"
+        ? "Script generated"
+        : generateState === "failed"
+          ? "Generation failed"
+          : "Generate script";
 
   // Filter annotations for rendering (exclude exiting ones from normal flow)
   const visibleAnnotations = annotations.filter(
@@ -2970,7 +3336,7 @@ export function PageFeedbackToolbarCSS({
       >
         {/* Morphing container */}
         <div
-          className={`${styles.toolbarContainer} ${!isDarkMode ? styles.light : ""} ${isActive ? styles.expanded : styles.collapsed} ${showEntranceAnimation ? styles.entrance : ""} ${isDraggingToolbar ? styles.dragging : ""} ${!settings.webhooksEnabled && (isValidUrl(settings.webhookUrl) || isValidUrl(webhookUrl || "")) ? styles.serverConnected : ""}`}
+          className={`${styles.toolbarContainer} ${!isDarkMode ? styles.light : ""} ${isActive ? styles.expanded : styles.collapsed} ${showEntranceAnimation ? styles.entrance : ""} ${isDraggingToolbar ? styles.dragging : ""} ${hasManualSendButton ? styles.serverConnected : ""}`}
           onClick={
             !isActive
               ? (e) => {
@@ -3012,7 +3378,7 @@ export function PageFeedbackToolbarCSS({
 
           {/* Controls content - visible when expanded */}
           <div
-            className={`${styles.controlsContent} ${isActive ? styles.visible : styles.hidden} ${
+          className={`${styles.controlsContent} ${isActive ? styles.visible : styles.hidden} ${
               toolbarPosition && toolbarPosition.y < 100
                 ? styles.tooltipBelow
                 : ""
@@ -3071,6 +3437,7 @@ export function PageFeedbackToolbarCSS({
                 }}
                 disabled={!hasAnnotations}
                 data-active={copied}
+                data-action="copy-feedback"
               >
                 <IconCopyAnimated size={24} copied={copied} />
               </button>
@@ -3080,9 +3447,36 @@ export function PageFeedbackToolbarCSS({
               </span>
             </div>
 
+            <div className={styles.buttonWrapper}>
+              <button
+                className={`${styles.controlButton} ${!isDarkMode ? styles.light : ""} ${generateState === "sent" || generateState === "failed" ? styles.statusShowing : ""}`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  hideTooltipsUntilMouseLeave();
+                  generateScript();
+                }}
+                disabled={
+                  !hasAnnotations ||
+                  (!onGenerateScript && !onSubmit) ||
+                  generateState === "generating"
+                }
+                data-no-hover={
+                  generateState === "sent" || generateState === "failed"
+                }
+                data-state={generateState}
+                data-action="generate-script"
+              >
+                <IconRobotStatus size={24} state={generateState} />
+              </button>
+              <span className={styles.buttonTooltip}>
+                {generateTooltipLabel}
+                <span className={styles.shortcut}>G</span>
+              </span>
+            </div>
+
             {/* Send button - only visible when webhook URL is available AND auto-send is off */}
             <div
-              className={`${styles.buttonWrapper} ${styles.sendButtonWrapper} ${!settings.webhooksEnabled && (isValidUrl(settings.webhookUrl) || isValidUrl(webhookUrl || "")) ? styles.sendButtonVisible : ""}`}
+              className={`${styles.buttonWrapper} ${styles.sendButtonWrapper} ${hasManualSendButton ? styles.sendButtonVisible : ""}`}
             >
               <button
                 className={`${styles.controlButton} ${!isDarkMode ? styles.light : ""} ${sendState === "sent" || sendState === "failed" ? styles.statusShowing : ""}`}
@@ -3131,6 +3525,7 @@ export function PageFeedbackToolbarCSS({
                 }}
                 disabled={!hasAnnotations}
                 data-danger
+                data-action="clear-all"
               >
                 <IconTrashAlt size={24} />
               </button>

@@ -9,7 +9,6 @@
 import type { Annotation } from "../types";
 
 const STORAGE_PREFIX = "feedback-annotations-";
-const DEFAULT_RETENTION_DAYS = 7;
 
 export function getStorageKey(pathname: string): string {
   return `${STORAGE_PREFIX}${pathname}`;
@@ -21,8 +20,7 @@ export function loadAnnotations<T = Annotation>(pathname: string): T[] {
     const stored = localStorage.getItem(getStorageKey(pathname));
     if (!stored) return [];
     const data = JSON.parse(stored);
-    const cutoff = Date.now() - DEFAULT_RETENTION_DAYS * 24 * 60 * 60 * 1000;
-    return data.filter((a: { timestamp?: number }) => !a.timestamp || a.timestamp > cutoff);
+    return Array.isArray(data) ? data : [];
   } catch {
     return [];
   }
@@ -55,7 +53,6 @@ export function loadAllAnnotations<T = Annotation>(): Map<string, T[]> {
   if (typeof window === "undefined") return result;
 
   try {
-    const cutoff = Date.now() - DEFAULT_RETENTION_DAYS * 24 * 60 * 60 * 1000;
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i);
       if (key?.startsWith(STORAGE_PREFIX)) {
@@ -63,11 +60,8 @@ export function loadAllAnnotations<T = Annotation>(): Map<string, T[]> {
         const stored = localStorage.getItem(key);
         if (stored) {
           const data = JSON.parse(stored);
-          const filtered = data.filter(
-            (a: { timestamp?: number }) => !a.timestamp || a.timestamp > cutoff
-          );
-          if (filtered.length > 0) {
-            result.set(pathname, filtered);
+          if (Array.isArray(data) && data.length > 0) {
+            result.set(pathname, data);
           }
         }
       }

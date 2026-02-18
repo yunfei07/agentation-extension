@@ -366,6 +366,149 @@ export const IconSendAnimated = ({ size = 24, sent = false }: { size?: number; s
   </svg>
 );
 
+const RobotBasePaths = () => (
+  <>
+    <path
+      d="M12 4V7"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+    />
+    <path
+      d="M9 4H15"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+    />
+    <rect
+      x="5"
+      y="7"
+      width="14"
+      height="11"
+      rx="3"
+      stroke="currentColor"
+      strokeWidth="1.5"
+    />
+    <circle cx="10" cy="12" r="1.1" fill="currentColor" />
+    <circle cx="14" cy="12" r="1.1" fill="currentColor" />
+    <path
+      d="M9.5 15.25H14.5"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+    />
+    <path
+      d="M5 12H3.75"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+    />
+    <path
+      d="M20.25 12H19"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+    />
+  </>
+);
+
+// Robot icon for script generation action
+export const IconRobot = ({ size = 24 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <RobotBasePaths />
+  </svg>
+);
+
+// Robot icon with generation status feedback
+export const IconRobotStatus = ({
+  size = 24,
+  state = "idle",
+}: {
+  size?: number;
+  state?: "idle" | "generating" | "sent" | "failed";
+}) => {
+  const isIdle = state === "idle";
+  const isGenerating = state === "generating";
+  const isSent = state === "sent";
+  const isFailed = state === "failed";
+
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <style>{`
+        .robot-icon,
+        .robot-check,
+        .robot-error {
+          transition: opacity 0.15s ease, transform 0.15s ease;
+        }
+        @keyframes robot-pulse {
+          0%, 100% { opacity: 0.5; transform: scale(0.85); }
+          50% { opacity: 0.95; transform: scale(1); }
+        }
+      `}</style>
+
+      <g
+        className="robot-icon"
+        style={{
+          opacity: isIdle ? 1 : isGenerating ? 0.55 : 0,
+          transform: isIdle ? "scale(1)" : "scale(0.85)",
+          transformOrigin: "center",
+          animation: isGenerating ? "robot-pulse 0.9s ease-in-out infinite" : "none",
+        }}
+      >
+        <RobotBasePaths />
+      </g>
+
+      <g
+        className="robot-check"
+        style={{
+          opacity: isSent ? 1 : 0,
+          transform: isSent ? "scale(1)" : "scale(0.85)",
+          transformOrigin: "center",
+        }}
+      >
+        <path
+          d="M12 20C7.58172 20 4 16.4182 4 12C4 7.58172 7.58172 4 12 4C16.4182 4 20 7.58172 20 12C20 16.4182 16.4182 20 12 20Z"
+          stroke="#22c55e"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+        <path
+          d="M15 10L11 14.25L9.25 12.25"
+          stroke="#22c55e"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </g>
+
+      <g
+        className="robot-error"
+        style={{
+          opacity: isFailed ? 1 : 0,
+          transform: isFailed ? "scale(1)" : "scale(0.85)",
+          transformOrigin: "center",
+        }}
+      >
+        <path
+          d="M12 20C7.58172 20 4 16.4182 4 12C4 7.58172 7.58172 4 12 4C16.4182 4 20 7.58172 20 12C20 16.4182 16.4182 20 12 20Z"
+          stroke="#ef4444"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+        <path
+          d="M12 8V12"
+          stroke="#ef4444"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+        />
+        <circle cx="12" cy="15" r="0.5" fill="#ef4444" stroke="#ef4444" strokeWidth="1" />
+      </g>
+    </svg>
+  );
+};
+
 // Eye icon (original)
 export const IconEye = ({ size = 16 }: { size?: number }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none">

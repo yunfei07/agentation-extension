@@ -50,6 +50,7 @@ The toolbar appears in the bottom-right corner. Click to activate, then click an
 | `onAnnotationsClear` | `(annotations: Annotation[]) => void` | - | Called when all annotations are cleared |
 | `onCopy` | `(markdown: string) => void` | - | Callback with markdown output when copy is clicked |
 | `onSubmit` | `(output: string, annotations: Annotation[]) => void` | - | Called when "Send Annotations" is clicked |
+| `onGenerateScript` | `(output: string, annotations: Annotation[]) => void \\| Promise<void>` | - | Called when the robot button is clicked to generate scripts |
 | `copyToClipboard` | `boolean` | `true` | Set to false to prevent writing to clipboard |
 | `endpoint` | `string` | - | Server URL for Agent Sync (e.g., `"http://localhost:4747"`) |
 | `sessionId` | `string` | - | Pre-existing session ID to join |

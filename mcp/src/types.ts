@@ -2,6 +2,35 @@
 // Shared Types
 // =============================================================================
 
+export type PlaywrightSelectorStrategy =
+  | "data-testid"
+  | "role"
+  | "label"
+  | "id"
+  | "name"
+  | "text"
+  | "css"
+  | "xpath";
+
+export type PlaywrightElementInfo = {
+  id?: string;
+  name?: string;
+  tag?: string;
+  type?: string;
+  text?: string;
+  role?: string;
+  label?: string;
+  dataTestId?: string;
+  css?: string;
+  xpath?: string;
+};
+
+export type PlaywrightSelectorCandidate = {
+  strategy: PlaywrightSelectorStrategy;
+  selector: string;
+  score: number;
+};
+
 export type Annotation = {
   id: string;
   x: number; // % of viewport width
@@ -21,6 +50,8 @@ export type Annotation = {
   isMultiSelect?: boolean; // true if created via drag selection
   isFixed?: boolean; // true if element has fixed/sticky positioning (marker stays fixed)
   reactComponents?: string; // React component hierarchy (e.g. "<App> <Dashboard> <Button>")
+  playwrightElementInfo?: PlaywrightElementInfo; // Structured element attributes for Playwright generation
+  playwrightTopSelectors?: PlaywrightSelectorCandidate[]; // Top-ranked stable selector candidates
 
   // Protocol fields (added when syncing to server)
   sessionId?: string;

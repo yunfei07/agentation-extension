@@ -239,7 +239,17 @@ export const AnnotationPopupCSS = forwardRef<AnnotationPopupCSSHandle, Annotatio
         <textarea
           ref={textareaRef}
           className={styles.textarea}
-          style={{ borderColor: isFocused ? accentColor : undefined }}
+          style={{
+            width: "100%",
+            borderColor: isFocused ? accentColor : undefined,
+            boxSizing: "border-box",
+            maxWidth: "100%",
+            minWidth: 0,
+            display: "block",
+            outline: "none",
+            boxShadow: "none",
+            overflowX: "hidden",
+          }}
           placeholder={placeholder}
           value={text}
           onChange={(e) => setText(e.target.value)}
