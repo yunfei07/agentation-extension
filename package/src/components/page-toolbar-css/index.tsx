@@ -37,8 +37,6 @@ import {
   IconMoon,
   IconXmarkLarge,
   IconEdit,
-  IconChevronLeft,
-  IconChevronRight,
 } from "../icons";
 import {
   identifyElement,
@@ -158,7 +156,7 @@ type ToolbarSettings = {
 };
 
 const DEFAULT_SETTINGS: ToolbarSettings = {
-  outputDetail: "standard",
+  outputDetail: "playwright",
   autoClearAfterCopy: false,
   annotationColor: "#3c82f7",
   blockInteractions: true,
@@ -194,14 +192,6 @@ const MARKER_CLICK_OPTIONS: {
 }[] = [
   { value: "edit", label: "Edit" },
   { value: "delete", label: "Delete" },
-];
-
-const OUTPUT_DETAIL_OPTIONS: { value: OutputDetailLevel; label: string }[] = [
-  { value: "compact", label: "Compact" },
-  { value: "standard", label: "Standard" },
-  { value: "detailed", label: "Detailed" },
-  { value: "playwright", label: "Playwright" },
-  { value: "forensic", label: "Forensic" },
 ];
 
 const COLOR_OPTIONS = [
@@ -765,10 +755,6 @@ export function PageFeedbackToolbarCSS({
   const [isFrozen, setIsFrozen] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showSettingsVisible, setShowSettingsVisible] = useState(false);
-  const [settingsPage, setSettingsPage] = useState<"main" | "automations">(
-    "main",
-  );
-  const [isTransitioning, setIsTransitioning] = useState(false);
   const [tooltipsHidden, setTooltipsHidden] = useState(false);
 
   // Cmd+shift+click multi-select state
@@ -881,7 +867,7 @@ export function PageFeedbackToolbarCSS({
                 zIndex: 100020,
                 pointerEvents: "none" as const,
                 boxShadow: "0px 1px 8px rgba(0, 0, 0, 0.28)",
-                opacity: visible && !isTransitioning ? 1 : 0,
+                opacity: visible ? 1 : 0,
                 transition: "opacity 0.15s ease",
               }}
             >
@@ -974,18 +960,10 @@ export function PageFeedbackToolbarCSS({
     } else {
       // Reset tooltips when settings close (fixes tooltips not showing after closing settings)
       setTooltipsHidden(false);
-      // Reset to main page when settings close
-      setSettingsPage("main");
       const timer = originalSetTimeout(() => setShowSettingsVisible(false), 0);
       return () => clearTimeout(timer);
     }
   }, [showSettings]);
-
-  useEffect(() => {
-    setIsTransitioning(true);
-    const timer = originalSetTimeout(() => setIsTransitioning(false), 350);
-    return () => clearTimeout(timer);
-  }, [settingsPage]);
 
   // Unified marker visibility - depends on BOTH toolbar active AND showMarkers toggle
   // This single effect handles all marker show/hide animations
@@ -1046,7 +1024,11 @@ export function PageFeedbackToolbarCSS({
     try {
       const storedSettings = localStorage.getItem("feedback-toolbar-settings");
       if (storedSettings) {
-        setSettings({ ...DEFAULT_SETTINGS, ...JSON.parse(storedSettings) });
+        setSettings({
+          ...DEFAULT_SETTINGS,
+          ...JSON.parse(storedSettings),
+          outputDetail: "playwright",
+        });
       }
     } catch (e) {
       // Ignore parsing errors
@@ -3603,11 +3585,9 @@ export function PageFeedbackToolbarCSS({
             }
           >
             <div
-              className={`${styles.settingsPanelContainer} ${isTransitioning ? styles.transitioning : ""}`}
+              className={styles.settingsPanelContainer}
             >
-              <div
-                className={`${styles.settingsPage} ${settingsPage === "automations" ? styles.slideLeft : ""}`}
-              >
+              <div className={styles.settingsPage}>
                 <div className={styles.settingsHeader}>
                   <span className={styles.settingsBrand}>
                     <span
@@ -3619,9 +3599,9 @@ export function PageFeedbackToolbarCSS({
                     >
                       /
                     </span>
-                    agentation
+                    FlowMarker
                   </span>
-                  <span className={styles.settingsVersion}>v{__VERSION__}</span>
+                  <span className={styles.settingsVersion}>v0.0.2</span>
                   <button
                     className={styles.themeToggle}
                     onClick={() => setIsDarkMode(!isDarkMode)}
@@ -3652,83 +3632,21 @@ export function PageFeedbackToolbarCSS({
                       className={`${styles.settingsLabel} ${!isDarkMode ? styles.light : ""}`}
                     >
                       Output Detail
-                      <Tooltip content="Controls how much detail is included in the copied output">
+                      <Tooltip content="Playwright mode is used for script generation output">
                         <span className={styles.helpIcon}>
                           <IconHelp size={20} />
                         </span>
                       </Tooltip>
                     </div>
-                    <button
+                    <div
                       className={`${styles.cycleButton} ${!isDarkMode ? styles.light : ""}`}
-                      onClick={() => {
-                        const currentIndex = OUTPUT_DETAIL_OPTIONS.findIndex(
-                          (opt) => opt.value === settings.outputDetail,
-                        );
-                        const nextIndex =
-                          (currentIndex + 1) % OUTPUT_DETAIL_OPTIONS.length;
-                        setSettings((s) => ({
-                          ...s,
-                          outputDetail: OUTPUT_DETAIL_OPTIONS[nextIndex].value,
-                        }));
-                      }}
+                      role="status"
+                      aria-label="Output detail fixed to Playwright"
                     >
-                      <span
-                        key={settings.outputDetail}
-                        className={styles.cycleButtonText}
-                      >
-                        {
-                          OUTPUT_DETAIL_OPTIONS.find(
-                            (opt) => opt.value === settings.outputDetail,
-                          )?.label
-                        }
-                      </span>
-                      <span className={styles.cycleDots}>
-                        {OUTPUT_DETAIL_OPTIONS.map((option, i) => (
-                          <span
-                            key={option.value}
-                            className={`${styles.cycleDot} ${!isDarkMode ? styles.light : ""} ${settings.outputDetail === option.value ? styles.active : ""}`}
-                          />
-                        ))}
-                      </span>
-                    </button>
+                      <span className={styles.cycleButtonText}>Playwright</span>
+                    </div>
                   </div>
 
-                  <div
-                    className={`${styles.settingsRow} ${styles.settingsRowMarginTop} ${!isLocalhost ? styles.settingsRowDisabled : ""}`}
-                  >
-                    <div
-                      className={`${styles.settingsLabel} ${!isDarkMode ? styles.light : ""}`}
-                    >
-                      React Components
-                      <Tooltip
-                        content={
-                          !isLocalhost
-                            ? "Disabled — production builds minify component names, making detection unreliable. Use on localhost in development mode."
-                            : "Include React component names in annotations"
-                        }
-                      >
-                        <span className={styles.helpIcon}>
-                          <IconHelp size={20} />
-                        </span>
-                      </Tooltip>
-                    </div>
-                    <label
-                      className={`${styles.toggleSwitch} ${!isLocalhost ? styles.disabled : ""}`}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={isLocalhost && settings.reactEnabled}
-                        disabled={!isLocalhost}
-                        onChange={() =>
-                          setSettings((s) => ({
-                            ...s,
-                            reactEnabled: !s.reactEnabled,
-                          }))
-                        }
-                      />
-                      <span className={styles.toggleSlider} />
-                    </label>
-                  </div>
                 </div>
 
                 <div className={styles.settingsSection}>
@@ -3828,150 +3746,6 @@ export function PageFeedbackToolbarCSS({
                       Block page interactions
                     </span>
                   </label>
-                </div>
-
-                <div
-                  className={`${styles.settingsSection} ${styles.settingsSectionExtraPadding}`}
-                >
-                  <button
-                    className={`${styles.settingsNavLink} ${!isDarkMode ? styles.light : ""}`}
-                    onClick={() => setSettingsPage("automations")}
-                  >
-                    <span>Manage MCP & Webhooks</span>
-                    <span className={styles.settingsNavLinkRight}>
-                      {endpoint && connectionStatus !== "disconnected" && (
-                        <span
-                          className={`${styles.mcpNavIndicator} ${styles[connectionStatus]}`}
-                        />
-                      )}
-                      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M7.5 12.5L12 8L7.5 3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                      </svg>
-                    </span>
-                  </button>
-                </div>
-              </div>
-
-              {/* Automations Page */}
-              <div
-                className={`${styles.settingsPage} ${styles.automationsPage} ${settingsPage === "automations" ? styles.slideIn : ""}`}
-              >
-                <button
-                  className={`${styles.settingsBackButton} ${!isDarkMode ? styles.light : ""}`}
-                  onClick={() => setSettingsPage("main")}
-                >
-                  <IconChevronLeft size={16} />
-                  <span>Manage MCP & Webhooks</span>
-                </button>
-
-                {/* MCP Connection section */}
-                <div className={styles.settingsSection}>
-                  <div className={styles.settingsRow}>
-                    <span
-                      className={`${styles.automationHeader} ${!isDarkMode ? styles.light : ""}`}
-                    >
-                      MCP Connection
-                      <Tooltip content="Connect via Model Context Protocol to let AI agents like Claude Code receive annotations in real-time.">
-                        <span
-                          className={`${styles.helpIcon} ${styles.helpIconNudgeDown}`}
-                        >
-                          <IconHelp size={20} />
-                        </span>
-                      </Tooltip>
-                    </span>
-                    {endpoint && (
-                      <div
-                        className={`${styles.mcpStatusDot} ${styles[connectionStatus]}`}
-                        title={
-                          connectionStatus === "connected"
-                            ? "Connected"
-                            : connectionStatus === "connecting"
-                              ? "Connecting..."
-                              : "Disconnected"
-                        }
-                      />
-                    )}
-                  </div>
-                  <p
-                    className={`${styles.automationDescription} ${!isDarkMode ? styles.light : ""}`}
-                    style={{ paddingBottom: 6 }}
-                  >
-                    MCP connection allows agents to receive and act on
-                    annotations.{" "}
-                    <a
-                      href="https://agentation.dev/mcp"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className={`${styles.learnMoreLink} ${!isDarkMode ? styles.light : ""}`}
-                    >
-                      Learn more
-                    </a>
-                  </p>
-                </div>
-
-                {/* Webhooks section */}
-                <div
-                  className={`${styles.settingsSection} ${styles.settingsSectionGrow}`}
-                >
-                  <div className={styles.settingsRow}>
-                    <span
-                      className={`${styles.automationHeader} ${!isDarkMode ? styles.light : ""}`}
-                    >
-                      Webhooks
-                      <Tooltip content="Send annotation data to any URL endpoint when annotations change. Useful for custom integrations.">
-                        <span
-                          className={`${styles.helpIcon} ${styles.helpIconNoNudge}`}
-                        >
-                          <IconHelp size={20} />
-                        </span>
-                      </Tooltip>
-                    </span>
-                    <div className={styles.autoSendRow}>
-                      <span
-                        className={`${styles.autoSendLabel} ${!isDarkMode ? styles.light : ""} ${settings.webhooksEnabled ? styles.active : ""}`}
-                      >
-                        Auto-Send
-                      </span>
-                      <label
-                        className={`${styles.toggleSwitch} ${!settings.webhookUrl ? styles.disabled : ""}`}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={settings.webhooksEnabled}
-                          disabled={!settings.webhookUrl}
-                          onChange={() =>
-                            setSettings((s) => ({
-                              ...s,
-                              webhooksEnabled: !s.webhooksEnabled,
-                            }))
-                          }
-                        />
-                        <span className={styles.toggleSlider} />
-                      </label>
-                    </div>
-                  </div>
-                  <p
-                    className={`${styles.automationDescription} ${!isDarkMode ? styles.light : ""}`}
-                  >
-                    The webhook URL will receive live annotation changes and
-                    annotation data.
-                  </p>
-                  <textarea
-                    className={`${styles.webhookUrlInput} ${!isDarkMode ? styles.light : ""}`}
-                    placeholder="Webhook URL"
-                    value={settings.webhookUrl}
-                    style={
-                      {
-                        "--marker-color": settings.annotationColor,
-                      } as React.CSSProperties
-                    }
-                    onChange={(e) =>
-                      setSettings((s) => ({
-                        ...s,
-                        webhookUrl: e.target.value,
-                      }))
-                    }
-                  />
                 </div>
               </div>
             </div>

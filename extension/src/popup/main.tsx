@@ -20,7 +20,7 @@ function Popup(): JSX.Element {
         color: "#0f172a",
       }}
     >
-      <h2 style={{ marginTop: 0, fontSize: "16px" }}>Agentation Extension</h2>
+      <h2 style={{ marginTop: 0, fontSize: "16px" }}>FlowMarker Extension</h2>
       <p style={{ marginTop: "8px", marginBottom: "12px", fontSize: "12px" }}>
         Runtime configuration is loaded from <code>backend/.env</code> at build
         time.
