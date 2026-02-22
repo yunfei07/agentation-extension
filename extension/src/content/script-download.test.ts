@@ -27,7 +27,7 @@ describe("saveScriptAsPythonFile", () => {
     const click = vi.fn();
     const anchor = { href: "", download: "", click };
     const deps: ScriptDownloadDependencies = {
-      requestExtensionDownload: vi.fn().mockResolvedValue(true),
+      requestExtensionDownload: vi.fn().mockResolvedValue({ ok: true }),
       createBlob: vi.fn().mockReturnValue({ type: "text/x-python" } as Blob),
       createObjectURL: vi.fn().mockReturnValue("blob:test-url"),
       revokeObjectURL: vi.fn(),
@@ -51,7 +51,7 @@ describe("saveScriptAsPythonFile", () => {
     const click = vi.fn();
     const anchor = { href: "", download: "", click };
     const deps: ScriptDownloadDependencies = {
-      requestExtensionDownload: vi.fn().mockResolvedValue(false),
+      requestExtensionDownload: vi.fn().mockResolvedValue({ ok: false }),
       createBlob: vi.fn().mockReturnValue({ type: "text/x-python" } as Blob),
       createObjectURL: vi.fn().mockReturnValue("blob:test-url"),
       revokeObjectURL: vi.fn(),

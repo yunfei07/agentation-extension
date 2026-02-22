@@ -19,13 +19,27 @@ export function AgentationExtensionApp(): JSX.Element {
           annotations,
         });
 
-        await navigator.clipboard.writeText(result.script);
         const savedFile = await saveScriptAsPythonFile(
           result.script,
           result.testName,
         );
+        let copiedToClipboard = false;
+        try {
+          await navigator.clipboard.writeText(result.script);
+          copiedToClipboard = true;
+        } catch (clipboardError) {
+          console.warn(
+            "[Agentation Extension] Clipboard write failed; script was still downloaded:",
+            clipboardError,
+          );
+        }
+        const assetLabel = result.metadata.asset
+          ? `, case=${result.metadata.asset.caseId}, version=${result.metadata.asset.versionNo}`
+          : "";
         console.info(
-          `[Agentation Extension] Generated ${result.testName}, copied to clipboard, saved as ${savedFile}`,
+          `[Agentation Extension] Generated ${result.testName}, ${
+            copiedToClipboard ? "copied to clipboard, " : ""
+          }saved as ${savedFile}${assetLabel}`,
         );
       } catch (generationError) {
         console.warn(

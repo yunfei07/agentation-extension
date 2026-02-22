@@ -45,10 +45,12 @@ pnpm extension:build
 
 The extension reads runtime config from `backend/.env` during build.
 Config keys:
+
 - `EXTENSION_BACKEND_URL` (default: `http://localhost:8000`)
 - `EXTENSION_MODEL` (fallback: `LLM_MODEL`, default: `qwen3.5-plus`)
 - `EXTENSION_TEMPERATURE` (fallback: `LLM_TEMPERATURE`, default: `0.2`)
 - `EXTENSION_MCP_ENDPOINT` (default: `http://localhost:4747`)
+- `EXTENSION_GENERATION_TIMEOUT_MS` (default: `300000`)
 
 Load `extension/dist` as an unpacked extension in Chrome.
 
@@ -62,6 +64,7 @@ make stack-up
 ```
 
 `make stack-up` does three things:
+
 - builds the extension bundle
 - starts MCP (`http://localhost:4747`)
 - starts FastAPI (`http://localhost:8000`)
@@ -86,6 +89,17 @@ uvicorn app.main:app --reload --port 8000
 The extension calls `POST /api/v1/scripts/playwright-python` to request Playwright (Python) tests.
 Use Python 3.12 or 3.13 for backend dependency compatibility.
 
+Asset APIs are also available:
+
+- `GET /api/v1/assets/cases`
+- `POST /api/v1/assets/cases`
+- `GET /api/v1/assets/cases/{case_id}`
+- `POST /api/v1/assets/cases/{case_id}/generate`
+- `POST /api/v1/assets/runs`
+- `GET /api/v1/assets/runs/{run_id}`
+
+When generation includes a `case_id`, backend appends trace headers (`fm_case_id`, `fm_version`, `fm_generated_at`, `fm_model`) to script output and returns linked `metadata.asset`.
+
 ## Features
 
 - **Click to annotate** - Click any element with automatic selector identification
@@ -106,14 +120,27 @@ Agentation captures class names, selectors, and element positions so AI agents c
 ## Requirements
 
 - React 18+
-- Desktop browser (mobile not supported)
 
-## Docs
+## 插件构建方式
 
-Full documentation at [agentation.dev](https://agentation.dev)
+```bash
+pnpm extension:build
+```
 
-## License
+## 插件使用方式
 
-© 2026 Benji Taylor
+1. 打开 Chrome 扩展程序页面（chrome://extensions/）。
+2. 打开右上角的“开发者模式”开关。
+3. 点击“加载已解压的扩展程序”，选择 `extension/dist` 目录。
 
-Licensed under PolyForm Shield 1.0.0
+## 服务端启动方式
+
+```bash
+cd backend
+python3.12 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+uvicorn app.main:app --reload --port 8000
+
+uvicorn app.main:app --reload --host 127.0.0.1 --port 8000 --log-level debug
+```

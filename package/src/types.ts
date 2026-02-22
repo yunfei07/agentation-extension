@@ -52,6 +52,10 @@ export type Annotation = {
   reactComponents?: string; // React component hierarchy (e.g. "<App> <Dashboard> <Button>")
   playwrightElementInfo?: PlaywrightElementInfo; // Structured element attributes for Playwright generation
   playwrightTopSelectors?: PlaywrightSelectorCandidate[]; // Top-ranked stable selector candidates
+  caseId?: string; // Linked test case asset id
+  stepIntent?: string; // Step-level intent for script generation
+  businessLabel?: string; // Business-level label/category
+  priority?: "p0" | "p1" | "p2" | "p3"; // Optional test priority
   elementBoundingBoxes?: Array<{
     x: number;
     y: number;

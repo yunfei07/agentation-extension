@@ -12,6 +12,7 @@ const links = [
   { href: "/schema", label: "Schema" },
   { href: "/mcp", label: "MCP" },
   { href: "/api", label: "API" },
+  { href: "/admin/cases", label: "Assets Admin" },
   { href: "/webhooks", label: "Webhooks" },
   { href: "/changelog", label: "Changelog" },
   { href: "/blog", label: "Blog" },
@@ -336,15 +337,21 @@ export function MobileNav() {
 
       <div className={`mobile-nav-links ${isOpen ? "open" : ""}`}>
         <div className="mobile-nav-links-inner">
-          {links.map((link) => (
-            <Link
-              key={link.href}
-              href={link.href}
-              className={`mobile-nav-link ${pathname === link.href ? "active" : ""}`}
-            >
-              {link.label}
-            </Link>
-          ))}
+          {links.map((link) => {
+            const isActive =
+              pathname === link.href ||
+              (link.href !== "/" && pathname.startsWith(`${link.href}/`));
+
+            return (
+              <Link
+                key={link.href}
+                href={link.href}
+                className={`mobile-nav-link ${isActive ? "active" : ""}`}
+              >
+                {link.label}
+              </Link>
+            );
+          })}
         </div>
       </div>
     </nav>

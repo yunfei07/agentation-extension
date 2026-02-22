@@ -449,6 +449,7 @@ export function SideNav() {
         { id: 'programmatic-usage', text: 'Programmatic Usage' },
       ],
     },
+    { href: "/admin/cases", label: "Assets Admin" },
     { href: "/webhooks", label: "Webhooks" },
     { section: "Resources" },
     { href: "/changelog", label: "Changelog" },
@@ -469,7 +470,9 @@ export function SideNav() {
             );
           }
 
-          const isActive = pathname === link.href;
+          const isActive =
+            pathname === link.href ||
+            (link.href !== "/" && pathname.startsWith(`${link.href}/`));
           const hasItems = 'items' in link && link.items && link.items.length > 0;
 
           return (

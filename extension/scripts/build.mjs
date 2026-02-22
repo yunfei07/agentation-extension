@@ -81,6 +81,11 @@ function resolveRuntimeConfig(parsedEnv) {
       "EXTENSION_MCP_ENDPOINT",
       "http://localhost:4747",
     ),
+    generationTimeoutMs: pickValue(
+      parsedEnv,
+      "EXTENSION_GENERATION_TIMEOUT_MS",
+      "300000",
+    ),
   };
 }
 
@@ -92,6 +97,9 @@ const define = {
   __EXTENSION_MODEL__: JSON.stringify(runtimeConfig.model),
   __EXTENSION_TEMPERATURE__: JSON.stringify(runtimeConfig.temperature),
   __EXTENSION_MCP_ENDPOINT__: JSON.stringify(runtimeConfig.mcpEndpoint),
+  __EXTENSION_GENERATION_TIMEOUT_MS__: JSON.stringify(
+    runtimeConfig.generationTimeoutMs,
+  ),
 };
 
 const commonBuildOptions = {
@@ -123,5 +131,5 @@ await Promise.all([
 ]);
 
 console.info(
-  `[extension build] Runtime config loaded from backend/.env: backendUrl=${runtimeConfig.backendUrl}, model=${runtimeConfig.model}, temperature=${runtimeConfig.temperature}, mcpEndpoint=${runtimeConfig.mcpEndpoint}`,
+  `[extension build] Runtime config loaded from backend/.env: backendUrl=${runtimeConfig.backendUrl}, model=${runtimeConfig.model}, temperature=${runtimeConfig.temperature}, mcpEndpoint=${runtimeConfig.mcpEndpoint}, generationTimeoutMs=${runtimeConfig.generationTimeoutMs}`,
 );

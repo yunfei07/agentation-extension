@@ -6,6 +6,8 @@
     "dev": "pnpm --filter agentation watch & pnpm --filter feedback-tool-example dev",
     "build": "pnpm --filter agentation build",
     "example": "pnpm --filter feedback-tool-example dev",
+    "admin:web": "pnpm --filter flowmarker-admin-web dev",
+    "admin:web:build": "pnpm --filter flowmarker-admin-web build",
     "pack": "cd package && pnpm pack",
     "mcp": "pnpm --filter agentation-mcp start",
     "backend:setup": "make backend-setup",

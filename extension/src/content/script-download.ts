@@ -2,7 +2,7 @@ export type ScriptDownloadDependencies = {
   requestExtensionDownload: (params: {
     fileName: string;
     script: string;
-  }) => Promise<boolean>;
+  }) => Promise<{ ok: boolean; error?: string }>;
   createBlob: (content: string) => Blob;
   createObjectURL: (blob: Blob) => string;
   revokeObjectURL: (url: string) => void;
@@ -39,22 +39,29 @@ const defaultDependencies: ScriptDownloadDependencies = {
     script: string;
   }) => {
     if (typeof chrome === "undefined" || !chrome.runtime?.sendMessage) {
-      return false;
+      return { ok: false, error: "chrome.runtime.sendMessage is unavailable" };
     }
 
-    return await new Promise<boolean>((resolve) => {
+    return await new Promise<{ ok: boolean; error?: string }>((resolve) => {
       chrome.runtime.sendMessage(
         {
           type: "AGENTATION_SAVE_SCRIPT",
           fileName,
           script,
+        } as {
+          type: string;
+          fileName: string;
+          script: string;
         },
-        (response: { ok?: boolean } | undefined) => {
+        (response: { ok?: boolean; error?: string } | undefined) => {
           if (chrome.runtime.lastError) {
-            resolve(false);
+            resolve({ ok: false, error: chrome.runtime.lastError.message });
             return;
           }
-          resolve(Boolean(response?.ok));
+          resolve({
+            ok: Boolean(response?.ok),
+            error: response?.error,
+          });
         },
       );
     });
@@ -65,7 +72,9 @@ const defaultDependencies: ScriptDownloadDependencies = {
   revokeObjectURL: (url: string) => URL.revokeObjectURL(url),
   createAnchor: () => document.createElement("a"),
   appendAnchor: (anchor) => {
-    document.body.appendChild(anchor as HTMLAnchorElement);
+    (document.body || document.documentElement).appendChild(
+      anchor as HTMLAnchorElement,
+    );
   },
   removeAnchor: (anchor) => {
     (anchor as HTMLAnchorElement).remove();
@@ -80,12 +89,17 @@ export async function saveScriptAsPythonFile(
   const fileName = buildPythonFileName(testName);
 
   try {
-    const savedByExtension = await deps.requestExtensionDownload({
+    const extensionResult = await deps.requestExtensionDownload({
       fileName,
       script,
     });
-    if (savedByExtension) {
+    if (extensionResult.ok) {
       return fileName;
+    }
+    if (extensionResult.error) {
+      console.warn(
+        `[Agentation Extension] Extension download failed (${extensionResult.error}); using anchor fallback.`,
+      );
     }
   } catch {
     // Fallback to anchor download below.
